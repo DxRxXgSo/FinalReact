@@ -26,9 +26,9 @@ const PermisosPerfil = () => {
       
       // ✅ Actualizado: Traemos Permisos, Perfiles y Módulos
       const [resPermisos, resPerfiles, resModulos] = await Promise.all([
-        axios.get('http://localhost:4000/api/permisos', config),
-        axios.get('http://localhost:4000/api/perfiles', config),
-        axios.get('http://localhost:4000/api/modulos', config)
+        axios.get('/api/permisos', config),
+        axios.get('/api/perfiles', config),
+        axios.get('/api/modulos', config)
       ]);
 
       setPermisos(resPermisos.data);
@@ -86,10 +86,10 @@ const PermisosPerfil = () => {
 
       if (p.id && !p.isVirtual) {
         // Actualizar existente
-        await axios.put(`http://localhost:4000/api/permisos/${p.id}`, payload, config);
+        await axios.put(`/api/permisos/${p.id}`, payload, config);
       } else {
         // Crear nueva asignación (POST)
-        await axios.post(`http://localhost:4000/api/permisos`, payload, config);
+        await axios.post(`/api/permisos`, payload, config);
         await fetchData(); // Recargamos para obtener el ID real
       }
       alert(`Permisos de "${p.strnombremodulo}" actualizados.`);

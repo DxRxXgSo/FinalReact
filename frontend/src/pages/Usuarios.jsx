@@ -31,8 +31,8 @@ const Usuarios = () => {
       setLoading(true);
       const config = { headers: { Authorization: `Bearer ${token}` } };
       const [resUsers, resProfiles] = await Promise.all([
-        axios.get('http://localhost:4000/api/usuarios', config),
-        axios.get('http://localhost:4000/api/perfiles', config)
+        axios.get('/api/usuarios', config),
+        axios.get('/api/perfiles', config)
       ]);
       setUsuarios(resUsers.data);
       setPerfiles(resProfiles.data);
@@ -51,9 +51,9 @@ const Usuarios = () => {
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
       if (editingId) {
-        await axios.put(`http://localhost:4000/api/usuarios/${editingId}`, formData, config);
+        await axios.put(`/api/usuarios/${editingId}`, formData, config);
       } else {
-        await axios.post('http://localhost:4000/api/usuarios', formData, config);
+        await axios.post('/api/usuarios', formData, config);
       }
       
       fetchData();
@@ -69,7 +69,7 @@ const Usuarios = () => {
   const handleDelete = async (id) => {
     if (window.confirm("¿Eliminar este usuario?")) {
       try {
-        await axios.delete(`http://localhost:4000/api/usuarios/${id}`, {
+        await axios.delete(`/api/usuarios/${id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         fetchData();

@@ -22,7 +22,7 @@ const Perfiles = () => {
   const fetchPerfiles = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:4000/api/perfiles', {
+      const response = await axios.get('/api/perfiles', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setPerfiles(response.data);
@@ -50,10 +50,10 @@ const Perfiles = () => {
       
       if (editingId) {
         // EDITAR (PUT)
-        await axios.put(`http://localhost:4000/api/perfiles/${editingId}`, formData, config);
+        await axios.put(`/api/perfiles/${editingId}`, formData, config);
       } else {
         // CREAR (POST)
-        await axios.post('http://localhost:4000/api/perfiles', formData, config);
+        await axios.post('/api/perfiles', formData, config);
       }
       
       // Recargamos la tabla y cerramos el modal
@@ -71,7 +71,7 @@ const Perfiles = () => {
   const handleDelete = async (id) => {
     if (window.confirm("¿Estás seguro de eliminar este perfil? Esto podría afectar a los usuarios que lo tengan asignado.")) {
       try {
-        await axios.delete(`http://localhost:4000/api/perfiles/${id}`, {
+        await axios.delete(`/api/perfiles/${id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         fetchPerfiles();

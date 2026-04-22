@@ -23,7 +23,7 @@ const Modulos = () => {
   const fetchModulos = async () => {
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const res = await axios.get('http://localhost:4000/api/modulos', config);
+      const res = await axios.get('/api/modulos', config);
       setModulos(res.data);
     } catch (error) {
       console.error("Error al cargar módulos:", error);
@@ -67,9 +67,9 @@ const Modulos = () => {
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
       if (isEditing) {
-        await axios.put(`http://localhost:4000/api/modulos/${currentId}`, formData, config);
+        await axios.put(`/api/modulos/${currentId}`, formData, config);
       } else {
-        await axios.post('http://localhost:4000/api/modulos', formData, config);
+        await axios.post('/api/modulos', formData, config);
       }
       
       cerrarModal();
@@ -86,7 +86,7 @@ const Modulos = () => {
 
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      await axios.delete(`http://localhost:4000/api/modulos/${id}`, config);
+      await axios.delete(`/api/modulos/${id}`, config);
       fetchModulos(); 
     } catch (error) {
       alert("No se pudo eliminar el módulo.");
