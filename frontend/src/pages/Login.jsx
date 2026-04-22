@@ -24,7 +24,7 @@ const Login = () => {
 
     try {
       // 2. Llamada al Backend (Enviamos el captchaToken)
-      const response = await axios.post('http://localhost:4000/api/auth/login', {
+      const response = await axios.post('/api/auth/login', {
         strNombreUsuario: formData.user,
         strPwd: formData.password,
         captchaToken: captchaToken 
