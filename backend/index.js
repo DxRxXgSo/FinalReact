@@ -47,3 +47,6 @@ app.listen(PORT, () => {
   console.log(`📂 Rutas cargadas: /api/perfiles, /api/usuarios, /api/permisos, /api/modulos`);
   console.log(`==========================================\n`);
 });
+
+// ✅ VITAL PARA VERCEL: Exportar la app
+module.exports = app;
