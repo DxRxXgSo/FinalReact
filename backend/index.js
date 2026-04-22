@@ -7,46 +7,41 @@ const pool = require('./config/db');
 
 const app = express();
 
-// 2. Middlewares Globales
-// Agregamos configuración de CORS explícita para evitar bloqueos con React
-app.use(cors({ origin: '*' })); 
+// 2. Middlewares
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// 3. Definición de Endpoints
-// IMPORTANTE: Si aquí usas '/api/perfiles', en el archivo perfilesRoutes.js 
-// el router.get debe ser '/' y NO '/api/perfiles'.
+// 3. Rutas API
 app.use('/api/perfiles', require('./routes/perfilesRoutes'));
 app.use('/api/usuarios', require('./routes/usuariosRoutes'));
 app.use('/api/permisos', require('./routes/permisosRoutes'));
-
-// ✅ NUEVA RUTA: Agregada para la gestión de Módulos
 app.use('/api/modulos', require('./routes/modulosRoutes'));
 
-// 4. Rutas de Autenticación
+// 4. Auth
 const { login } = require('./controllers/authController');
 app.post('/api/auth/login', login);
 
-// 5. Verificación de estado y Base de Datos
+// 5. Health check
 app.get('/', (req, res) => {
-  res.send('🚀 Servidor de Panel Corp Operando Correctamente');
+  res.send('🚀 API funcionando correctamente');
 });
 
-// Comprobar la conexión a PostgreSQL al arrancar
+// 6. Conexión DB (sin bloquear ejecución)
 pool.connect()
   .then(client => {
-    console.log('✅ Base de datos conectada exitosamente a Render/Postgres');
+    console.log('✅ DB conectada');
     client.release();
   })
-  .catch(err => console.error('❌ Error crítico de base de datos:', err.stack));
+  .catch(err => console.error('❌ Error DB:', err));
 
-// 6. Iniciar Servidor
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`\n==========================================`);
-  console.log(`🚀 Servidor corriendo en: http://localhost:${PORT}`);
-  console.log(`📂 Rutas cargadas: /api/perfiles, /api/usuarios, /api/permisos, /api/modulos`);
-  console.log(`==========================================\n`);
-});
+// ❌ NO usar app.listen en Vercel
+// SOLO usarlo en local
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Servidor local en http://localhost:${PORT}`);
+  });
+}
 
-// ✅ VITAL PARA VERCEL: Exportar la app
+// ✅ Export obligatorio
 module.exports = app;

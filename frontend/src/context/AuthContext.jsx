@@ -1,38 +1,77 @@
-import React, { createContext, useState, useContext } from 'react';
+
+import React, { createContext, useState, useContext, useEffect } from 'react';
 
 const AuthContext = createContext();
 
+/**
+ * 🔐 PROVIDER DE AUTENTICACIÓN (VERSIÓN PRO)
+ */
 export const AuthProvider = ({ children }) => {
-  // ✅ Inicialización segura: recupera la sesión al instante si existe
-  const [token, setToken] = useState(() => localStorage.getItem('token') || null);
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    try {
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch (error) {
-      return null;
-    }
-  });
 
+  const [token, setToken] = useState(null);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true); // 🔥 clave para evitar errores
+
+  /**
+   * 🔄 Cargar sesión al iniciar app
+   */
+  useEffect(() => {
+    try {
+      const savedToken = localStorage.getItem('token');
+      const savedUser = localStorage.getItem('user');
+
+      if (savedToken) setToken(savedToken);
+      if (savedUser) setUser(JSON.parse(savedUser));
+
+    } catch (error) {
+      console.error('❌ Error leyendo sesión:', error);
+      localStorage.removeItem('user');
+    } finally {
+      setLoading(false); // ✅ importante
+    }
+  }, []);
+
+  /**
+   * 🔓 Login
+   */
   const login = (userData, userToken) => {
-    setToken(userToken);
-    setUser(userData);
-    localStorage.setItem('token', userToken);
-    localStorage.setItem('user', JSON.stringify(userData));
+    try {
+      setToken(userToken);
+      setUser(userData);
+
+      localStorage.setItem('token', userToken);
+      localStorage.setItem('user', JSON.stringify(userData));
+
+    } catch (error) {
+      console.error('❌ Error guardando sesión:', error);
+    }
   };
 
+  /**
+   * 🔒 Logout
+   */
   const logout = () => {
     setToken(null);
     setUser(null);
+
     localStorage.removeItem('token');
     localStorage.removeItem('user');
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      token,
+      loading, // 🔥 ahora disponible en toda la app
+      login,
+      logout
+    }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
+/**
+ * 🎯 Hook personalizado
+ */
 export const useAuth = () => useContext(AuthContext);
