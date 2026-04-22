@@ -1,0 +1,23 @@
+/* Variables para Colores Pastel */
+:root {
+  --bg-pastel: #FDFCF0;
+  --btn-pastel-pink: #FFB7B2;
+  --btn-pastel-blue: #AEC6CF;
+  --btn-pastel-green: #B2E2F2;
+}
+
+/* Ajustes para Modo Oscuro (Bootstrap 5 nativo) */
+[data-bs-theme="dark"] {
+  --bs-body-bg: #1A1A1B;
+  --bs-body-color: #f8f9fa;
+}
+
+body {
+  background-color: var(--bg-pastel);
+  transition: background-color 0.3s ease;
+}
+
+/* Clases personalizadas para tus botones pastel */
+.btn-pastel-pink { background-color: var(--btn-pastel-pink); border: none; color: white; }
+.btn-pastel-blue { background-color: var(--btn-pastel-blue); border: none; color: white; }
+.btn-pastel-pink:hover, .btn-pastel-blue:hover { opacity: 0.8; color: white; }
