@@ -12,12 +12,12 @@ const Modulos = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   
-  // ✅ ESTÁNDAR: Usamos 'strnombremodulo' en minúsculas para coincidir con Postgres
   const [formData, setFormData] = useState({ strnombremodulo: '', ubicacion: 'Principal' });
 
+  // ✅ Mejoramos la búsqueda para que no falle por una letra o acento
   const permisos = user?.permisos?.find(p => {
     const nombreBD = p.strnombremodulo?.trim().toLowerCase();
-    return nombreBD === 'modulo' || nombreBD === 'modulos';
+    return nombreBD === 'modulo' || nombreBD === 'modulos' || nombreBD === 'módulos';
   }) || {};
 
   const fetchModulos = async () => {
@@ -46,7 +46,6 @@ const Modulos = () => {
   const abrirModalEditar = (modulo) => {
     setIsEditing(true);
     setCurrentId(modulo.id);
-    // ✅ Mapeo correcto de los campos de la base de datos al formulario
     setFormData({ 
       strnombremodulo: modulo.strnombremodulo, 
       ubicacion: modulo.ubicacion || 'Principal' 
@@ -75,8 +74,7 @@ const Modulos = () => {
       cerrarModal();
       fetchModulos(); 
     } catch (error) {
-      console.error("Error al guardar:", error);
-      alert("Error al guardar. Asegúrate de que el backend esté usando nombres en minúsculas.");
+      alert("Error al guardar. Verifica que el módulo exista.");
     }
   };
 
@@ -86,10 +84,12 @@ const Modulos = () => {
 
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
+      // ✅ URL RELATIVA PARA VERCEL
       await axios.delete(`/api/modulos/${id}`, config);
       fetchModulos(); 
     } catch (error) {
-      alert("No se pudo eliminar el módulo.");
+      console.error("Error al eliminar:", error);
+      alert("Error 404: No se pudo encontrar la ruta de borrado. Verifica el backend.");
     }
   };
 
@@ -97,13 +97,11 @@ const Modulos = () => {
 
   return (
     <div className="container-fluid animate__animated animate__fadeIn position-relative">
-      
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h3 className="fw-bold mb-0" style={{ color: '#2c3e50' }}>Gestión de Módulos</h3>
           <p className="text-muted small">Configura las secciones y su ubicación en el menú.</p>
         </div>
-        
         {permisos.bitagregar && (
           <button 
             className="btn text-white px-4 shadow-sm fw-bold rounded-pill d-flex align-items-center" 
@@ -120,8 +118,8 @@ const Modulos = () => {
           <table className="table table-hover align-middle mb-0">
             <thead className="bg-light text-muted small text-uppercase">
               <tr>
-                <th className="ps-4 py-3">ID</th>
-                <th>Módulo</th>
+                {/* ID TOTALMENTE OCULTO */}
+                <th className="ps-4 py-3">Módulo</th>
                 <th>Ubicación</th>
                 <th className="text-center">Estado</th>
                 <th className="text-end pe-4">Acciones</th>
@@ -130,8 +128,8 @@ const Modulos = () => {
             <tbody>
               {modulos.map((m) => (
                 <tr key={m.id} className="border-bottom">
-                  <td className="ps-4 fw-bold text-muted">#{m.id}</td>
-                  <td>
+                  {/* ID TOTALMENTE OCULTO */}
+                  <td className="ps-4">
                     <div className="d-flex align-items-center gap-3">
                       <div className="p-2 rounded-3 bg-light text-primary"><Layers size={18} /></div>
                       <div className="fw-bold text-dark">{m.strnombremodulo}</div>
@@ -173,7 +171,6 @@ const Modulos = () => {
               <h5 className="fw-bold mb-0">{isEditing ? 'Editar Módulo' : 'Crear Módulo'}</h5>
               <button className="btn btn-sm btn-light rounded-circle" onClick={cerrarModal}><X size={20} /></button>
             </div>
-            
             <form onSubmit={handleSubmit}>
               <div className="card-body p-4">
                 <div className="mb-3">
@@ -186,7 +183,6 @@ const Modulos = () => {
                     onChange={(e) => setFormData({ ...formData, strnombremodulo: e.target.value })}
                     required
                   />
-
                   <label className="form-label text-muted small fw-bold">Ubicación en el Menú</label>
                   <select 
                     className="form-select bg-light border-0 p-3 rounded-3"
@@ -200,7 +196,6 @@ const Modulos = () => {
                   </select>
                 </div>
               </div>
-              
               <div className="card-footer bg-white border-top-0 pb-4 px-4 d-flex gap-2">
                 <button type="button" className="btn btn-light w-50 rounded-pill fw-bold" onClick={cerrarModal}>Cancelar</button>
                 <button type="submit" className="btn text-white w-50 rounded-pill fw-bold d-flex align-items-center justify-content-center" style={{ backgroundColor: 'var(--btn-pastel-blue)' }}>
@@ -211,7 +206,6 @@ const Modulos = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

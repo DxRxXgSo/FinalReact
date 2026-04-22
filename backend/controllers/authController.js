@@ -5,6 +5,7 @@ const login = async (req, res) => {
   const { strNombreUsuario, strPwd, captchaToken } = req.body;
 
   try {
+    // 1. Validación de Captcha
     if (!captchaToken) {
       return res.status(400).json({ message: "Por favor, completa el captcha" });
     }
@@ -17,7 +18,7 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Fallo la validación del Captcha de Google" });
     }
 
-    // 3. Buscar usuario (Corregido a minúsculas para evitar fallos de lectura)
+    // 2. Buscar usuario
     const userQuery = `
       SELECT u.id, u.strNombreUsuario, u.strPwd, u.idPerfil, u.idEstadoUsuario,
              p.strNombrePerfil, p.bitAdministrador 
@@ -33,6 +34,7 @@ const login = async (req, res) => {
 
     const user = userResult.rows[0];
 
+    // Verificación de estado (Postgres devuelve todo en minúsculas)
     if (!user.idestadousuario) {
       return res.status(401).json({ message: "El usuario se encuentra inactivo" });
     }
@@ -41,7 +43,7 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Contraseña incorrecta" });
     }
 
-    // ✅ AQUÍ ESTABA EL ERROR: Faltaba m.ubicacion y los alias en minúsculas
+    // 3. Obtener Permisos con Ubicación
     const permisosQuery = `
       SELECT 
         m.strNombreModulo AS strnombremodulo, 
@@ -57,8 +59,14 @@ const login = async (req, res) => {
     `;
     const permisosResult = await pool.query(permisosQuery, [user.idperfil]);
 
+    // ✅ CAMBIO CLAVE: Metemos 'bitadministrador' en el payload del JWT
     const token = jwt.sign(
-      { id: user.id, perfil: user.idperfil, nombre: user.strnombreusuario },
+      { 
+        id: user.id, 
+        idperfil: user.idperfil, // Coincide con lo que busca checkPermission
+        nombre: user.strnombreusuario,
+        bitadministrador: user.bitadministrador // <--- ESTO ES VITAL
+      },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
@@ -70,12 +78,12 @@ const login = async (req, res) => {
         nombre: user.strnombreusuario,
         perfil: user.strnombreperfil,
         esAdmin: user.bitadministrador,
-        permisos: permisosResult.rows // ✅ Ahora sí incluye la ubicación
+        permisos: permisosResult.rows 
       }
     });
 
   } catch (error) {
-    console.error('Error en Login:', error);
+    console.error('❌ Error en Login:', error);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
@@ -92,6 +100,7 @@ const verifyToken = (req, res, next) => {
     if (err) {
       return res.status(401).json({ message: "Token inválido" });
     }
+    // 'decoded' ahora contendrá idperfil y bitadministrador
     req.user = decoded; 
     next(); 
   });
