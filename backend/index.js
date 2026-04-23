@@ -7,10 +7,19 @@ const pool = require('./config/db');
 
 const app = express();
 
-// 2. Middlewares Globales
-app.use(cors({ origin: '*' })); 
+// 2. ✅ CONFIGURACIÓN DE CORS REFORZADA
+// Esto le dice al backend específicamente en quién confiar
+app.use(cors({
+  origin: [
+    'https://final-react-amber.vercel.app', // Tu dominio de Vercel
+    'http://localhost:5173',                 // Tu local para seguir trabajando
+    'http://localhost:3000'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+})); 
 
-// ✅ CORRECCIÓN: Aumentamos el límite para soportar imágenes en Base64 (Error 413)
+// ✅ Aumentamos el límite para soportar imágenes en Base64 (Error 413)
 app.use(express.json({ limit: '10mb' })); 
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
@@ -40,12 +49,9 @@ pool.connect()
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`\n==========================================`);
-  console.log(`🚀 Servidor corriendo en: http://localhost:${PORT}`);
-  console.log(`📂 Rutas activas:`);
-  console.log(`   - /api/auth (Login y Tiempo Real)`);
-  console.log(`   - /api/perfiles, /api/usuarios, /api/modulos`);
+  console.log(`🚀 Servidor corriendo correctamente`);
   console.log(`==========================================\n`);
 });
 
-// ✅ VITAL PARA VERCEL
+// ✅ VITAL PARA VERCEL / RENDER
 module.exports = app;
