@@ -1,16 +1,17 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
-import ReCAPTCHA from "react-google-recaptcha"; // <-- Importamos Google reCAPTCHA
+// ✅ 1. Importamos tu nueva instancia de API en lugar de axios directamente
+import api from '../api'; 
+import ReCAPTCHA from "react-google-recaptcha";
 
 const Login = () => {
   const [formData, setFormData] = useState({ user: '', password: '' });
-  const [captchaToken, setCaptchaToken] = useState(null); // Estado para el token de Google
+  const [captchaToken, setCaptchaToken] = useState(null); 
   const [error, setError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
-  const recaptchaRef = useRef(); // Referencia para reiniciar el captcha si hay error
+  const recaptchaRef = useRef(); 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,8 +24,8 @@ const Login = () => {
     }
 
     try {
-      // 2. Llamada al Backend (Enviamos el captchaToken)
-      const response = await axios.post('/api/auth/login', {
+      // ✅ 2. Usamos 'api' y quitamos '/api' de la ruta porque ya viene configurado en baseURL
+      const response = await api.post('/auth/login', {
         strNombreUsuario: formData.user,
         strPwd: formData.password,
         captchaToken: captchaToken 
@@ -42,7 +43,6 @@ const Login = () => {
     }
   };
 
-  // Guardamos la llave en una constante para que el código quede más limpio
   const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
   return (

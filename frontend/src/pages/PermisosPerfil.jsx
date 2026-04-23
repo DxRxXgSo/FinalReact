@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, ChevronLeft, ChevronRight, Download, CheckCircle, Zap } from 'lucide-react';
-import axios from 'axios';
+import { ShieldCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Save, CheckCircle, Zap, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+// ✅ Importamos nuestra API en lugar de axios
+import api from '../api'; 
 
 const PermisosPerfil = () => {
   const [perfiles, setPerfiles] = useState([]);
-  const [modulos, setModulos] = useState([]); // ✅ NUEVO: Para traer la lista maestra
-  const [selectedPerfil, setSelectedPerfil] = useState(""); 
-  const [permisos, setPermisos] = useState([]);
+  const [modulos, setModulos] = useState([]);
+  const [selectedPerfil, setSelectedPerfil] = useState("");
+  const [permisos, setPermisos] = useState([]); 
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 5; 
-  
-  const { token, user } = useAuth();
+  const rowsPerPage = 5;
+
+  // ✅ Solo extraemos el 'user', el token ya lo maneja api.js
+  const { user } = useAuth();
 
   const permisosUsuario = user?.permisos?.find(p => {
     const nombreBD = p.strnombremodulo?.trim().toLowerCase();
@@ -22,88 +26,100 @@ const PermisosPerfil = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      
-      // ✅ Actualizado: Traemos Permisos, Perfiles y Módulos
+      // ✅ Peticiones múltiples limpias sin 'config' ni 'localhost'
       const [resPermisos, resPerfiles, resModulos] = await Promise.all([
-        axios.get('/api/permisos', config),
-        axios.get('/api/perfiles', config),
-        axios.get('/api/modulos', config)
+        api.get('/permisos'),
+        api.get('/perfiles'),
+        api.get('/modulos')
       ]);
 
       setPermisos(resPermisos.data);
       setPerfiles(resPerfiles.data);
-      setModulos(resModulos.data); // ✅ Guardamos los módulos reales
+      setModulos(resModulos.data);
 
       if (resPerfiles.data.length > 0 && !selectedPerfil) {
         setSelectedPerfil(resPerfiles.data[0].id);
       }
     } catch (error) {
-      console.error("Error al cargar la matriz SaaS:", error);
+      console.error("Error al cargar la matriz:", error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (token) fetchData();
-  }, [token]);
+    fetchData();
+  }, []); // ✅ Ya no dependemos del token en el useEffect
 
-  // ✅ Actualizado: Ahora busca por idmodulo para soportar registros nuevos (virtuales)
   const handleTogglePermiso = (idModulo, campo) => {
     setPermisos(prev => {
       const index = prev.findIndex(p => Number(p.idmodulo) === Number(idModulo) && Number(p.idperfil) === Number(selectedPerfil));
-      
+      let newPermisos = [...prev];
+
       if (index >= 0) {
-        const newPermisos = [...prev];
-        newPermisos[index] = { ...newPermisos[index], [campo]: !newPermisos[index][campo] };
-        return newPermisos;
+        const currentStatus = !newPermisos[index][campo];
+        if (campo === 'bitconsulta' && currentStatus === false) {
+          newPermisos[index] = { 
+            ...newPermisos[index], 
+            bitconsulta: false, bitagregar: false, biteditar: false, biteliminar: false, bitdetalle: false,
+            hasChanged: true 
+          };
+        } else {
+          newPermisos[index] = { ...newPermisos[index], [campo]: currentStatus, hasChanged: true };
+        }
       } else {
-        // Si no existe el permiso para este perfil aún, creamos el objeto en memoria
-        return [...prev, {
+        newPermisos.push({
           idperfil: selectedPerfil,
           idmodulo: idModulo,
-          bitconsulta: false, bitagregar: false, biteditar: false, biteliminar: false, bitdetalle: false,
-          [campo]: true,
-          isVirtual: true 
-        }];
+          bitconsulta: campo === 'bitconsulta',
+          bitagregar: campo === 'bitagregar',
+          biteditar: campo === 'biteditar',
+          biteliminar: campo === 'biteliminar',
+          bitdetalle: campo === 'bitdetalle',
+          isVirtual: true,
+          hasChanged: true
+        });
       }
+      return newPermisos;
     });
   };
 
-  const handleSave = async (p) => {
-    try {
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      const payload = {
-        idperfil: Number(selectedPerfil),
-        idmodulo: Number(p.idmodulo),
-        bitconsulta: !!p.bitconsulta,
-        bitagregar: !!p.bitagregar,
-        biteditar: !!p.biteditar,
-        biteliminar: !!p.biteliminar,
-        bitdetalle: !!p.bitdetalle
-      };
+  const handleSaveAll = async () => {
+    const cambiosPendientes = permisosFiltrados.filter(p => p.hasChanged);
+    if (cambiosPendientes.length === 0) return;
 
-      if (p.id && !p.isVirtual) {
-        // Actualizar existente
-        await axios.put(`/api/permisos/${p.id}`, payload, config);
-      } else {
-        // Crear nueva asignación (POST)
-        await axios.post(`/api/permisos`, payload, config);
-        await fetchData(); // Recargamos para obtener el ID real
-      }
-      alert(`Permisos de "${p.strnombremodulo}" actualizados.`);
+    setSaving(true);
+    try {
+      // ✅ Peticiones dinámicas (PUT o POST) ultra limpias
+      const promesas = cambiosPendientes.map(p => {
+        const payload = {
+          idperfil: Number(selectedPerfil),
+          idmodulo: Number(p.idmodulo),
+          bitconsulta: !!p.bitconsulta,
+          bitagregar: !!p.bitagregar,
+          biteditar: !!p.biteditar,
+          biteliminar: !!p.biteliminar,
+          bitdetalle: !!p.bitdetalle
+        };
+        return (p.id && !p.isVirtual) 
+          ? api.put(`/permisos/${p.id}`, payload)
+          : api.post(`/permisos`, payload);
+      });
+
+      await Promise.all(promesas);
+      alert("¡Todos los cambios han sido guardados exitosamente!");
+      await fetchData();
     } catch (error) {
-      alert("Error al guardar en la base de datos.");
+      alert("Error al guardar los cambios.");
+    } finally {
+      setSaving(false);
     }
   };
 
-  // ✅ LA MAGIA: Cruzamos la lista de todos los módulos con los permisos existentes
   const permisosFiltrados = modulos.map(m => {
     const permisoExistente = permisos.find(
       p => Number(p.idmodulo) === Number(m.id) && Number(p.idperfil) === Number(selectedPerfil)
     );
-
     return permisoExistente ? { ...permisoExistente, strnombremodulo: m.strnombremodulo } : {
       isVirtual: true,
       idmodulo: m.id,
@@ -113,25 +129,36 @@ const PermisosPerfil = () => {
     };
   });
 
+  const currentRows = permisosFiltrados.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
   const totalPages = Math.ceil(permisosFiltrados.length / rowsPerPage);
-  const currentRows = permisosFiltrados.slice(
-    (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage
-  );
+  const hasChanges = permisosFiltrados.some(p => p.hasChanged);
 
   if (loading) return <div className="vh-100 d-flex justify-content-center align-items-center"><div className="spinner-border text-info"></div></div>;
 
   return (
     <div className="container-fluid animate__animated animate__fadeIn">
       
+      {/* HEADER */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h3 className="fw-bold mb-1" style={{ color: '#2c3e50' }}>Matriz de Permisos (RBAC)</h3>
-          <p className="text-muted small mb-0">Configuración avanzada de privilegios por rol.</p>
+          <h3 className="fw-bold mb-1" style={{ color: '#2c3e50' }}>Matriz de Permisos</h3>
+          <p className="text-muted small mb-0">Configura accesos granulares para el perfil seleccionado.</p>
         </div>
+        
+        {permisosUsuario.biteditar && (
+          <button 
+            className={`btn px-4 py-2 rounded-pill fw-bold shadow-sm d-flex align-items-center gap-2 transition-all ${hasChanges ? 'btn-pastel-blue text-white' : 'btn-light text-muted'}`}
+            onClick={handleSaveAll}
+            disabled={saving || !hasChanges}
+          >
+            {saving ? <span className="spinner-border spinner-border-sm"></span> : <Save size={18} />}
+            {saving ? 'Guardando...' : 'Guardar Cambios'}
+          </button>
+        )}
       </div>
 
-      <div className="d-flex flex-wrap gap-2 mb-4 p-3 bg-white rounded-4 shadow-sm border border-light">
+      {/* SELECTOR */}
+      <div className="d-flex flex-wrap gap-2 mb-4 p-3 bg-white rounded-4 shadow-sm border">
         <div className="input-group" style={{ width: 'auto' }}>
           <span className="input-group-text bg-white border-danger text-danger"><Zap size={16} /></span>
           <select 
@@ -144,58 +171,51 @@ const PermisosPerfil = () => {
             ))}
           </select>
         </div>
-        <button className="btn btn-light text-success border small fw-bold ms-auto"><Download size={14} className="me-2" /> Exportar</button>
+        {hasChanges && (
+          <div className="ms-3 d-flex align-items-center text-primary small fw-bold">
+            <AlertCircle size={14} className="me-1"/> Tienes cambios sin guardar
+          </div>
+        )}
       </div>
 
       <div className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0">
-            <thead className="bg-white text-muted small text-uppercase">
-              <tr className="border-bottom">
+            <thead className="bg-light text-muted small text-uppercase">
+              <tr>
                 <th className="ps-4 py-3">Módulo</th>
-                <th className="text-center" style={{color: 'var(--cb-green)'}}>Ver</th>
-                <th className="text-center" style={{color: 'var(--cb-blue)'}}>Crear</th>
-                <th className="text-center" style={{color: 'var(--cb-yellow)'}}>Editar</th>
-                <th className="text-center" style={{color: 'var(--cb-pink)'}}>Eliminar</th>
-                <th className="text-center" style={{color: 'var(--cb-purple)'}}>Detalle</th>
-                <th className="text-end pe-4">Acción</th>
+                <th className="text-center">Ver</th>
+                <th className="text-center">Crear</th>
+                <th className="text-center">Editar</th>
+                <th className="text-center">Eliminar</th>
+                <th className="text-center">Detalle</th>
               </tr>
             </thead>
             <tbody>
               {currentRows.map((p) => (
-                <tr key={p.idmodulo} className="border-bottom">
+                <tr key={p.idmodulo} className={p.hasChanged ? "bg-primary-subtle bg-opacity-10" : "border-bottom"}>
                   <td className="ps-4">
                     <div className="d-flex align-items-center gap-2">
-                      <ShieldCheck size={16} className={p.isVirtual ? "text-warning" : "text-muted"} />
-                      <div className="fw-bold text-dark">{p.strnombremodulo}</div>
-                      {p.isVirtual && <span className="badge bg-warning text-dark ms-1" style={{fontSize: '9px'}}>NUEVO</span>}
+                      <ShieldCheck size={16} className={p.bitconsulta ? "text-success" : "text-muted"} />
+                      <div className={`fw-bold ${p.hasChanged ? 'text-primary' : 'text-dark'}`}>
+                        {p.strnombremodulo}
+                      </div>
                     </div>
                   </td>
-                  
                   <td className="text-center">
                     <input type="checkbox" className="custom-cb cb-green" checked={p.bitconsulta || false} onChange={() => handleTogglePermiso(p.idmodulo, 'bitconsulta')} disabled={!permisosUsuario.biteditar} />
                   </td>
                   <td className="text-center">
-                    <input type="checkbox" className="custom-cb cb-blue" checked={p.bitagregar || false} onChange={() => handleTogglePermiso(p.idmodulo, 'bitagregar')} disabled={!permisosUsuario.biteditar} />
+                    <input type="checkbox" className="custom-cb cb-blue" checked={p.bitagregar || false} onChange={() => handleTogglePermiso(p.idmodulo, 'bitagregar')} disabled={!permisosUsuario.biteditar || !p.bitconsulta} />
                   </td>
                   <td className="text-center">
-                    <input type="checkbox" className="custom-cb cb-yellow" checked={p.biteditar || false} onChange={() => handleTogglePermiso(p.idmodulo, 'biteditar')} disabled={!permisosUsuario.biteditar} />
+                    <input type="checkbox" className="custom-cb cb-yellow" checked={p.biteditar || false} onChange={() => handleTogglePermiso(p.idmodulo, 'biteditar')} disabled={!permisosUsuario.biteditar || !p.bitconsulta} />
                   </td>
                   <td className="text-center">
-                    <input type="checkbox" className="custom-cb cb-pink" checked={p.biteliminar || false} onChange={() => handleTogglePermiso(p.idmodulo, 'biteliminar')} disabled={!permisosUsuario.biteditar} />
+                    <input type="checkbox" className="custom-cb cb-pink" checked={p.biteliminar || false} onChange={() => handleTogglePermiso(p.idmodulo, 'biteliminar')} disabled={!permisosUsuario.biteditar || !p.bitconsulta} />
                   </td>
                   <td className="text-center">
-                    <input type="checkbox" className="custom-cb cb-purple" checked={p.bitdetalle || false} onChange={() => handleTogglePermiso(p.idmodulo, 'bitdetalle')} disabled={!permisosUsuario.biteditar} />
-                  </td>
-                  
-                  <td className="text-end pe-4">
-                    {permisosUsuario.biteditar ? (
-                      <button className="btn btn-sm text-white rounded-pill px-3 shadow-sm fw-bold" style={{ backgroundColor: p.isVirtual ? '#f39c12' : 'var(--btn-pastel-blue)' }} onClick={() => handleSave(p)}>
-                        {p.isVirtual ? 'Asignar' : 'Guardar'}
-                      </button>
-                    ) : (
-                      <span className="text-muted small px-2">Solo Lectura</span>
-                    )}
+                    <input type="checkbox" className="custom-cb cb-purple" checked={p.bitdetalle || false} onChange={() => handleTogglePermiso(p.idmodulo, 'bitdetalle')} disabled={!permisosUsuario.biteditar || !p.bitconsulta} />
                   </td>
                 </tr>
               ))}
@@ -204,24 +224,28 @@ const PermisosPerfil = () => {
         </div>
 
         <div className="card-footer bg-white border-0 p-3 d-flex justify-content-between align-items-center">
-          <span className="text-muted small">Mostrando {currentRows.length} de {permisosFiltrados.length} módulos</span>
-          <nav>
-            <ul className="pagination pagination-sm mb-0 gap-1">
-              <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                <button className="page-link rounded-circle border-0 text-dark shadow-none" onClick={() => setCurrentPage(p => p - 1)}>
-                  <ChevronLeft size={16}/>
-                </button>
-              </li>
-              <li className="page-item active">
-                <span className="page-link rounded-circle border-0 px-3 fw-bold" style={{ backgroundColor: 'var(--btn-pastel-pink)', color: 'white' }}>{currentPage}</span>
-              </li>
-              <li className={`page-item ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`}>
-                <button className="page-link rounded-circle border-0 text-dark shadow-none" onClick={() => setCurrentPage(p => p + 1)}>
-                  <ChevronRight size={16}/>
-                </button>
-              </li>
-            </ul>
-          </nav>
+          <div className="d-flex gap-1">
+            <button className="btn btn-outline-secondary btn-sm rounded-circle border-0" disabled={currentPage === 1} onClick={() => setCurrentPage(1)}>
+              <ChevronsLeft size={18}/>
+            </button>
+            <button className="btn btn-outline-secondary btn-sm rounded-circle border-0" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+              <ChevronLeft size={18}/>
+            </button>
+          </div>
+
+          <span className="badge rounded-circle d-flex align-items-center justify-content-center shadow-sm" 
+                style={{ backgroundColor: 'var(--btn-pastel-pink)', color: 'white', width: '32px', height: '32px', fontSize: '14px' }}>
+            {currentPage}
+          </span>
+
+          <div className="d-flex gap-1">
+            <button className="btn btn-outline-secondary btn-sm rounded-circle border-0" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)}>
+              <ChevronRight size={18}/>
+            </button>
+            <button className="btn btn-outline-secondary btn-sm rounded-circle border-0" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(totalPages)}>
+              <ChevronsRight size={18}/>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -234,8 +258,7 @@ const PermisosPerfil = () => {
         .cb-yellow:checked { background-color: var(--cb-yellow); border-color: var(--cb-yellow); }
         .cb-pink:checked { background-color: var(--cb-pink); border-color: var(--cb-pink); }
         .cb-purple:checked { background-color: var(--cb-purple); border-color: var(--cb-purple); }
-        .custom-cb:disabled { opacity: 0.4; cursor: not-allowed; background-color: #e9ecef; }
-        .page-link:hover { background-color: #f0f7f9; }
+        .custom-cb:disabled { opacity: 0.3; cursor: not-allowed; background-color: #eee; filter: grayscale(1); }
       `}</style>
     </div>
   );

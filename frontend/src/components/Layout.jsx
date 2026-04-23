@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, User, Shield, LayoutGrid, Home, ChevronRight, Folder } from 'lucide-react';
+import { LogOut, User, Shield, LayoutGrid, Home, ChevronRight, Folder, Settings } from 'lucide-react';
 
 const Layout = ({ children }) => {
   const { logout, user } = useAuth();
@@ -17,7 +17,7 @@ const Layout = ({ children }) => {
     navigate('/login');
   };
 
-  // ✅ 1. DICCIONARIO DE RUTAS: Para que /usuario vaya a /usuarios, etc.
+  // ✅ 1. DICCIONARIO DE RUTAS
   const getRuta = (nombre) => {
     const key = nombre.trim().toLowerCase();
     const rutasFijas = {
@@ -29,46 +29,47 @@ const Layout = ({ children }) => {
     return rutasFijas[key] || `/d/${encodeURIComponent(nombre)}`;
   };
 
-// ✅ 2. LÓGICA DE AGRUPACIÓN POR CARPETAS
-  const menuSaaS = {
-    'Seguridad': [],
-    'Principal 1': [],
-    'Principal 2': []
-  };
+  // ✅ 2. LÓGICA DE AGRUPACIÓN POR CARPETAS
+  const menuSaaS = {
+    'Seguridad': [],
+    'Principal 1': [],
+    'Principal 2': []
+  };
 
-  const modulosSeguridad = ['perfil', 'usuario', 'modulo', 'permisosperfil'];
+  const modulosSeguridad = ['perfil', 'usuario', 'modulo', 'permisosperfil'];
 
-  if (user?.permisos) {
-    user.permisos.forEach(p => {
-      if (!p.bitconsulta) return; 
+  if (user?.permisos) {
+    user.permisos.forEach(p => {
+      if (!p.bitconsulta) return; 
 
-      const nombreLow = p.strnombremodulo?.trim().toLowerCase();
-      const ubi = p.ubicacion?.trim();
+      const nombreLow = p.strnombremodulo?.trim().toLowerCase();
+      const ubi = p.ubicacion?.trim();
 
-      // Regla 1: Seguridad
-      if (modulosSeguridad.includes(nombreLow)) {
-        menuSaaS['Seguridad'].push(p);
-      } 
-      // Regla 2: Coincidencia exacta con la ubicación de la base de datos
-      else if (ubi === 'Principal 1') {
-        menuSaaS['Principal 1'].push(p);
-      } 
-      else if (ubi === 'Principal 2') {
-        menuSaaS['Principal 2'].push(p);
-      }
-      // Regla 3: Carpeta dinámica para cualquier otra ubicación nueva
+      // Regla 1: Seguridad
+      if (modulosSeguridad.includes(nombreLow)) {
+        menuSaaS['Seguridad'].push(p);
+      } 
+      // Regla 2: Coincidencia exacta
+      else if (ubi === 'Principal 1') {
+        menuSaaS['Principal 1'].push(p);
+      } 
+      else if (ubi === 'Principal 2') {
+        menuSaaS['Principal 2'].push(p);
+      }
+      // Regla 3: Carpeta dinámica
       else {
         if (!menuSaaS[ubi]) menuSaaS[ubi] = [];
         menuSaaS[ubi].push(p);
       }
-    });
-  }
+    });
+  }
 
   const breadcrumbNombres = {
     'perfiles': 'Gestión de Perfiles',
     'usuarios': 'Gestión de Usuarios',
     'modulos': 'Módulos del Sistema',
-    'permisos': 'Matriz de Permisos'
+    'permisos': 'Matriz de Permisos',
+    'mi-perfil': 'Mi Configuración'
   };
 
   const pathnames = location.pathname.split('/').filter((x) => x);
@@ -122,25 +123,43 @@ const Layout = ({ children }) => {
               })}
             </ul>
 
-            {/* SECCIÓN IDENTIDAD USUARIO */}
+            {/* SECCIÓN IDENTIDAD USUARIO CORREGIDA */}
             <div className="d-flex align-items-center gap-3 ms-auto border-start ps-4">
               <div className="text-end d-none d-md-block">
                 <div className="fw-bold small" style={{ color: 'var(--btn-pastel-blue)' }}>
+                  {/* Lee el nombre del usuario */}
                   {user?.strnombreusuario || user?.nombre || 'Usuario'}
                 </div>
                 <div className="text-muted text-uppercase" style={{ fontSize: '10px' }}>
+                  {/* Lee el perfil del usuario */}
                   {user?.strnombreperfil || user?.perfil || 'Sin Perfil'}
                 </div>
               </div>
               
               <div className="dropdown">
-                <div className="rounded-circle d-flex align-items-center justify-content-center cursor-pointer text-white shadow-sm" 
-                     style={{ width: '40px', height: '40px', backgroundColor: 'var(--btn-pastel-blue)' }} 
+                {/* ✅ AVATAR DINÁMICO */}
+                <div className="rounded-circle d-flex align-items-center justify-content-center cursor-pointer shadow-sm border overflow-hidden bg-light" 
+                     style={{ width: '40px', height: '40px' }} 
                      data-bs-toggle="dropdown">
-                  <User size={20} />
+                  {(user?.imgurl || user?.imgURL) ? (
+                    <img src={user.imgurl || user.imgURL} alt="Perfil" className="w-100 h-100 object-fit-cover" />
+                  ) : (
+                    <User size={20} className="text-muted" />
+                  )}
                 </div>
                 <ul className="dropdown-menu dropdown-menu-end border-0 shadow mt-3">
-                  <li><button onClick={handleLogout} className="dropdown-item text-danger fw-bold"><LogOut size={16} className="me-2" /> Salir</button></li>
+                  {/* ✅ OPCIÓN A MI CONFIGURACIÓN */}
+                  <li>
+                    <Link to="/mi-perfil" className="dropdown-item d-flex align-items-center py-2 fw-medium">
+                      <Settings size={16} className="me-2 text-primary" /> Mi Configuración
+                    </Link>
+                  </li>
+                  <li><hr className="dropdown-divider" /></li>
+                  <li>
+                    <button onClick={handleLogout} className="dropdown-item text-danger fw-bold py-2 d-flex align-items-center">
+                      <LogOut size={16} className="me-2" /> Salir
+                    </button>
+                  </li>
                 </ul>
               </div>
             </div>
@@ -190,6 +209,7 @@ const Layout = ({ children }) => {
         .nav-link:hover { color: var(--btn-pastel-blue) !important; }
         .dropdown-item:hover { background-color: #f8fbff; color: var(--btn-pastel-blue); }
         .active { color: var(--btn-pastel-blue) !important; font-weight: 700 !important; }
+        .cursor-pointer { cursor: pointer; }
       `}</style>
       
     </div>

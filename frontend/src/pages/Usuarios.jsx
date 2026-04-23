@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserPlus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, Camera, UserCheck, UserX, Eye, Mail, Shield, Phone, User as UserIcon, Lock } from 'lucide-react';
-import axios from 'axios';
+import { UserPlus, Edit2, Trash2, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Camera, UserCheck, UserX, Eye, Mail, Shield, Phone, User as UserIcon, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+// ✅ 1. Importamos nuestra API configurada
+import api from '../api'; 
 
 const Usuarios = () => {
   const [usuarios, setUsuarios] = useState([]);
@@ -9,7 +11,9 @@ const Usuarios = () => {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 5;
-  const { token } = useAuth();
+  
+  // ✅ 2. Ya no sacamos el 'token', el interceptor se encarga
+  const { user: loggedUser } = useAuth(); 
 
   const [formData, setFormData] = useState({
     strNombreUsuario: '',
@@ -25,14 +29,16 @@ const Usuarios = () => {
   const [editingId, setEditingId] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const closeModalBtn = useRef(null);
+  
+  const fileInputRef = useRef(null);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const config = { headers: { Authorization: `Bearer ${token}` } };
+      // ✅ 3. Peticiones súper limpias usando Promise.all
       const [resUsers, resProfiles] = await Promise.all([
-        axios.get('/api/usuarios', config),
-        axios.get('/api/perfiles', config)
+        api.get('/usuarios'),
+        api.get('/perfiles')
       ]);
       setUsuarios(resUsers.data);
       setPerfiles(resProfiles.data);
@@ -43,17 +49,36 @@ const Usuarios = () => {
     }
   };
 
-  useEffect(() => { if (token) fetchData(); }, [token]);
+  useEffect(() => { 
+    fetchData(); 
+  }, []); // ✅ Ya no dependemos de token aquí
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result); 
+        setFormData({ ...formData, imgURL: reader.result }); 
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSave = async () => {
     try {
       setLoading(true);
-      const config = { headers: { Authorization: `Bearer ${token}` } };
       
+      // ✅ 4. Peticiones PUT y POST sin la variable config
       if (editingId) {
-        await axios.put(`/api/usuarios/${editingId}`, formData, config);
+        await api.put(`/usuarios/${editingId}`, formData);
+        
+        // Aviso si el Admin se editó a sí mismo
+        if (loggedUser && editingId === loggedUser.id) {
+          alert("Has editado tu propio perfil. Cierra sesión y vuelve a entrar para ver tu foto/nombre en el menú principal.");
+        }
       } else {
-        await axios.post('/api/usuarios', formData, config);
+        await api.post('/usuarios', formData);
       }
       
       fetchData();
@@ -69,9 +94,8 @@ const Usuarios = () => {
   const handleDelete = async (id) => {
     if (window.confirm("¿Eliminar este usuario?")) {
       try {
-        await axios.delete(`/api/usuarios/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        // ✅ 5. Petición DELETE limpia
+        await api.delete(`/usuarios/${id}`);
         fetchData();
       } catch (error) {
         alert("Error al eliminar");
@@ -83,15 +107,15 @@ const Usuarios = () => {
     if (user) {
       setEditingId(user.id);
       setFormData({
-        strNombreUsuario: user.strnombreusuario,
-        strPwd: '', // Vacío por seguridad al editar
-        idPerfil: user.idperfil,
-        strCorreo: user.strcorreo,
-        strNumeroCelular: user.strnumerocelular || '',
-        idEstadoUsuario: user.idestadousuario,
-        imgURL: user.imgurl
+        strNombreUsuario: user.strnombreusuario || user.strNombreUsuario,
+        strPwd: '', 
+        idPerfil: user.idperfil || user.idPerfil,
+        strCorreo: user.strcorreo || user.strCorreo,
+        strNumeroCelular: user.strnumerocelular || user.strNumeroCelular || '',
+        idEstadoUsuario: user.idestadousuario ?? user.idEstadoUsuario,
+        imgURL: user.imgurl || user.imgURL || ''
       });
-      setPreview(user.imgurl);
+      setPreview(user.imgurl || user.imgURL || null);
     } else {
       resetForm();
     }
@@ -101,6 +125,7 @@ const Usuarios = () => {
     setEditingId(null);
     setPreview(null);
     setFormData({ strNombreUsuario: '', strPwd: '', idPerfil: '', strCorreo: '', strNumeroCelular: '', idEstadoUsuario: true, imgURL: '' });
+    if (fileInputRef.current) fileInputRef.current.value = ""; 
   };
 
   const indexOfLastRow = currentPage * rowsPerPage;
@@ -113,7 +138,7 @@ const Usuarios = () => {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h3 className="fw-bold mb-0" style={{ color: 'var(--btn-pastel-blue)' }}>Gestión de Usuarios</h3>
-          <p className="text-muted small">Administra los accesos y estatus de los colaboradores.</p>
+          <p className="text-muted small">Administra los colaboradores y su información personal.</p>
         </div>
         <button className="btn btn-pastel-green text-white fw-bold px-4 py-2 shadow-sm border-0 d-flex align-items-center" 
                 data-bs-toggle="modal" data-bs-target="#userModal" onClick={() => openModal()}>
@@ -138,14 +163,14 @@ const Usuarios = () => {
                 <tr key={u.id} className="border-bottom">
                   <td className="ps-4">
                     <div className="d-flex align-items-center">
-                      <img src={u.imgurl || 'https://via.placeholder.com/40'} className="rounded-circle me-3 shadow-sm" style={{ width: '40px', height: '40px', objectFit: 'cover' }} />
-                      <span className="fw-bold text-dark">{u.strnombreusuario}</span>
+                      <img src={u.imgurl || u.imgURL || 'https://via.placeholder.com/40'} className="rounded-circle me-3 shadow-sm" style={{ width: '40px', height: '40px', objectFit: 'cover' }} />
+                      <span className="fw-bold text-dark">{u.strnombreusuario || u.strNombreUsuario}</span>
                     </div>
                   </td>
-                  <td>{u.strcorreo}</td>
-                  <td><span className="badge bg-light text-dark border px-3">{u.strnombreperfil}</span></td>
+                  <td>{u.strcorreo || u.strCorreo}</td>
+                  <td><span className="badge bg-light text-dark border px-3">{u.strnombreperfil || u.strNombrePerfil}</span></td>
                   <td className="text-center">
-                    {u.idestadousuario ? <span className="text-success small"><UserCheck size={14}/> Activo</span> : <span className="text-danger small"><UserX size={14}/> Inactivo</span>}
+                    {(u.idestadousuario ?? u.idEstadoUsuario) ? <span className="text-success small"><UserCheck size={14}/> Activo</span> : <span className="text-danger small"><UserX size={14}/> Inactivo</span>}
                   </td>
                   <td className="text-center">
                     <div className="d-flex justify-content-center gap-2">
@@ -159,10 +184,21 @@ const Usuarios = () => {
             </tbody>
           </table>
         </div>
+
+        {/* PAGINACIÓN */}
         <div className="card-footer bg-white border-0 p-3 d-flex justify-content-between align-items-center">
-          <button className="btn btn-outline-secondary btn-sm rounded-pill" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}><ChevronLeft size={16}/></button>
-          <span className="small text-muted fw-bold">Página {currentPage} de {totalPages || 1}</span>
-          <button className="btn btn-outline-secondary btn-sm rounded-pill" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}><ChevronRight size={16}/></button>
+          <div className="d-flex gap-1">
+            <button className="btn btn-outline-secondary btn-sm rounded-circle border-0" disabled={currentPage === 1} onClick={() => setCurrentPage(1)}><ChevronsLeft size={18}/></button>
+            <button className="btn btn-outline-secondary btn-sm rounded-circle border-0" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}><ChevronLeft size={18}/></button>
+          </div>
+          <span className="badge rounded-circle d-flex align-items-center justify-content-center shadow-sm" 
+                style={{ backgroundColor: 'var(--btn-pastel-blue)', color: 'white', width: '32px', height: '32px', fontSize: '14px' }}>
+            {currentPage}
+          </span>
+          <div className="d-flex gap-1">
+            <button className="btn btn-outline-secondary btn-sm rounded-circle border-0" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)}><ChevronRight size={18}/></button>
+            <button className="btn btn-outline-secondary btn-sm rounded-circle border-0" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(totalPages)}><ChevronsRight size={18}/></button>
+          </div>
         </div>
       </div>
 
@@ -178,10 +214,28 @@ const Usuarios = () => {
               <div className="row g-3">
                 <div className="col-12 text-center mb-2">
                    <div className="position-relative d-inline-block">
-                      <div className="rounded-circle border border-3 border-pastel-blue shadow-sm overflow-hidden" style={{ width: '90px', height: '90px' }}>
+                      <div 
+                        className="rounded-circle border border-3 border-pastel-blue shadow-sm overflow-hidden bg-light" 
+                        style={{ width: '90px', height: '90px', cursor: 'pointer' }}
+                        onClick={() => fileInputRef.current.click()} 
+                      >
                         {preview ? <img src={preview} className="w-100 h-100 object-fit-cover" /> : <UserIcon size={40} className="mt-3 text-muted"/>}
                       </div>
-                      <div className="position-absolute bottom-0 end-0 bg-white rounded-circle shadow-sm p-1" style={{cursor: 'pointer'}}><Camera size={16} className="text-primary"/></div>
+                      <div 
+                        className="position-absolute bottom-0 end-0 bg-white rounded-circle shadow-sm p-1 border" 
+                        style={{cursor: 'pointer'}}
+                        onClick={() => fileInputRef.current.click()} 
+                      >
+                        <Camera size={16} className="text-primary"/>
+                      </div>
+                      
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="d-none" 
+                        accept="image/*" 
+                        onChange={handleFileChange} 
+                      />
                    </div>
                 </div>
 
@@ -249,14 +303,14 @@ const Usuarios = () => {
             </div>
             <div className="modal-body p-4 text-center">
               <div className="rounded-circle border border-4 border-white shadow-sm mx-auto mb-3 overflow-hidden" style={{ width: '100px', height: '100px' }}>
-                 {selectedUser?.imgurl ? <img src={selectedUser.imgurl} className="w-100 h-100 object-fit-cover" /> : <UserIcon size={50} className="text-muted mt-3" />}
+                 {selectedUser?.imgurl || selectedUser?.imgURL ? <img src={selectedUser.imgurl || selectedUser.imgURL} className="w-100 h-100 object-fit-cover" /> : <UserIcon size={50} className="text-muted mt-3" />}
               </div>
-              <h4 className="fw-bold mb-1">@{selectedUser?.strnombreusuario}</h4>
+              <h4 className="fw-bold mb-1">@{selectedUser?.strnombreusuario || selectedUser?.strNombreUsuario}</h4>
               <div className="row g-3 text-start bg-light p-3 rounded-4 mt-2">
-                <div className="col-6"><label className="text-muted fw-bold small d-block">PERFIL</label><div className="small fw-medium text-dark"><Shield size={14} className="text-primary me-1"/> {selectedUser?.strnombreperfil}</div></div>
-                <div className="col-6"><label className="text-muted fw-bold small d-block">ESTADO</label><div className="small fw-bold">{selectedUser?.idestadousuario ? <span className="text-success"><UserCheck size={14}/> Activo</span> : <span className="text-danger"><UserX size={14}/> Inactivo</span>}</div></div>
-                <div className="col-12 border-top pt-2"><label className="text-muted fw-bold small d-block">CORREO</label><div className="small text-dark"><Mail size={14} className="text-info me-1"/> {selectedUser?.strcorreo}</div></div>
-                <div className="col-12 border-top pt-2"><label className="text-muted fw-bold small d-block">TELÉFONO</label><div className="small text-dark"><Phone size={14} className="text-success me-1"/> {selectedUser?.strnumerocelular || 'N/A'}</div></div>
+                <div className="col-6"><label className="text-muted fw-bold small d-block">PERFIL</label><div className="small fw-medium text-dark"><Shield size={14} className="text-primary me-1"/> {selectedUser?.strnombreperfil || selectedUser?.strNombrePerfil}</div></div>
+                <div className="col-6"><label className="text-muted fw-bold small d-block">ESTADO</label><div className="small fw-bold">{(selectedUser?.idestadousuario ?? selectedUser?.idEstadoUsuario) ? <span className="text-success"><UserCheck size={14}/> Activo</span> : <span className="text-danger"><UserX size={14}/> Inactivo</span>}</div></div>
+                <div className="col-12 border-top pt-2"><label className="text-muted fw-bold small d-block">CORREO</label><div className="small text-dark"><Mail size={14} className="text-info me-1"/> {selectedUser?.strcorreo || selectedUser?.strCorreo}</div></div>
+                <div className="col-12 border-top pt-2"><label className="text-muted fw-bold small d-block">TELÉFONO</label><div className="small text-dark"><Phone size={14} className="text-success me-1"/> {selectedUser?.strnumerocelular || selectedUser?.strNumeroCelular || 'N/A'}</div></div>
               </div>
             </div>
             <div className="modal-footer border-0">
@@ -270,6 +324,7 @@ const Usuarios = () => {
         .custom-switch-md .form-check-input { width: 3em; height: 1.5em; cursor: pointer; }
         .form-check-input:checked { background-color: #2ecc71 !important; border-color: #2ecc71 !important; }
         .border-pastel-blue { border-color: var(--btn-pastel-blue) !important; }
+        .page-link:hover { background-color: #f8f9fa; }
       `}</style>
     </div>
   );

@@ -1,11 +1,11 @@
 const pool = require('../config/db');
 const jwt = require('jsonwebtoken');
 
+// --- LOGIN ---
 const login = async (req, res) => {
   const { strNombreUsuario, strPwd, captchaToken } = req.body;
 
   try {
-    // 1. Validación de Captcha
     if (!captchaToken) {
       return res.status(400).json({ message: "Por favor, completa el captcha" });
     }
@@ -18,9 +18,10 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Fallo la validación del Captcha de Google" });
     }
 
-    // 2. Buscar usuario
+    // ✅ CORRECCIÓN: Agregamos correo y celular al SELECT
     const userQuery = `
-      SELECT u.id, u.strNombreUsuario, u.strPwd, u.idPerfil, u.idEstadoUsuario,
+      SELECT u.id, u.strNombreUsuario, u.strPwd, u.idPerfil, u.idEstadoUsuario, u.imgURL, 
+             u.strCorreo, u.strNumeroCelular,
              p.strNombrePerfil, p.bitAdministrador 
       FROM Usuario u 
       JOIN Perfil p ON u.idPerfil = p.id 
@@ -34,7 +35,6 @@ const login = async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // Verificación de estado (Postgres devuelve todo en minúsculas)
     if (!user.idestadousuario) {
       return res.status(401).json({ message: "El usuario se encuentra inactivo" });
     }
@@ -43,7 +43,6 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Contraseña incorrecta" });
     }
 
-    // 3. Obtener Permisos con Ubicación
     const permisosQuery = `
       SELECT 
         m.strNombreModulo AS strnombremodulo, 
@@ -59,35 +58,91 @@ const login = async (req, res) => {
     `;
     const permisosResult = await pool.query(permisosQuery, [user.idperfil]);
 
-    // ✅ CAMBIO CLAVE: Metemos 'bitadministrador' en el payload del JWT
     const token = jwt.sign(
-      { 
-        id: user.id, 
-        idperfil: user.idperfil, // Coincide con lo que busca checkPermission
-        nombre: user.strnombreusuario,
-        bitadministrador: user.bitadministrador // <--- ESTO ES VITAL
-      },
+      { id: user.id, perfil: user.idperfil, nombre: user.strnombreusuario },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
 
+    // ✅ CORRECCIÓN: Mandamos correo y celular al Frontend
     res.json({
       token,
       user: {
         id: user.id,
         nombre: user.strnombreusuario,
+        strnombreusuario: user.strnombreusuario,
         perfil: user.strnombreperfil,
+        strnombreperfil: user.strnombreperfil,
+        imgurl: user.imgurl,
+        strcorreo: user.strcorreo,             // <--- Faltaba esto
+        strnumerocelular: user.strnumerocelular, // <--- Faltaba esto
         esAdmin: user.bitadministrador,
-        permisos: permisosResult.rows 
+        permisos: permisosResult.rows
       }
     });
 
   } catch (error) {
-    console.error('❌ Error en Login:', error);
+    console.error('Error en Login:', error);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
+// --- GET ME (Para actualización en tiempo real) ---
+const getMe = async (req, res) => {
+  try {
+    // ✅ CORRECCIÓN: Agregamos correo y celular también aquí
+    const userQuery = `
+      SELECT u.id, u.strNombreUsuario as nombre, u.strNombreUsuario as strnombreusuario, 
+             u.idPerfil, u.imgURL as imgurl, u.strCorreo as strcorreo, u.strNumeroCelular as strnumerocelular,
+             p.strNombrePerfil as perfil, p.strNombrePerfil as strnombreperfil, p.bitAdministrador as esadmin
+      FROM Usuario u
+      JOIN Perfil p ON u.idPerfil = p.id
+      WHERE u.id = $1
+    `;
+    const userResult = await pool.query(userQuery, [req.user.id]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    const user = userResult.rows[0];
+
+    const permisosQuery = `
+      SELECT 
+        m.strNombreModulo AS strnombremodulo, 
+        m.ubicacion AS ubicacion,
+        pp.bitAgregar AS bitagregar, 
+        pp.bitEditar AS biteditar, 
+        pp.bitConsulta AS bitconsulta, 
+        pp.bitEliminar AS biteliminar, 
+        pp.bitDetalle AS bitdetalle
+      FROM PermisosPerfil pp
+      JOIN Modulo m ON pp.idModulo = m.id
+      WHERE pp.idPerfil = $1
+    `;
+    const permisosResult = await pool.query(permisosQuery, [user.idperfil]);
+
+    // ✅ CORRECCIÓN: Aseguramos la misma estructura
+    res.json({
+      id: user.id,
+      nombre: user.nombre,
+      strnombreusuario: user.strnombreusuario,
+      perfil: user.perfil,
+      strnombreperfil: user.strnombreperfil,
+      imgurl: user.imgurl,
+      strcorreo: user.strcorreo,             // <--- Faltaba esto
+      strnumerocelular: user.strnumerocelular, // <--- Faltaba esto
+      esAdmin: user.esadmin,
+      permisos: permisosResult.rows
+    });
+
+  } catch (error) {
+    console.error('Error en getMe:', error);
+    res.status(500).json({ message: "Error al sincronizar datos en tiempo real" });
+  }
+};
+
+// --- MIDDLEWARE: verifyToken ---
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -100,10 +155,9 @@ const verifyToken = (req, res, next) => {
     if (err) {
       return res.status(401).json({ message: "Token inválido" });
     }
-    // 'decoded' ahora contendrá idperfil y bitadministrador
     req.user = decoded; 
     next(); 
   });
 };
 
-module.exports = { login, verifyToken };
+module.exports = { login, getMe, verifyToken };

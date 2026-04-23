@@ -1,30 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Shield, Plus, Edit3, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import axios from 'axios';
-import { useAuth } from '../context/AuthContext'; 
+
+// ✅ 1. Importamos nuestra API en lugar de axios
+import api from '../api'; 
 
 const Perfiles = () => {
   const [perfiles, setPerfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 5;
-  const { token } = useAuth(); 
 
-  // --- NUEVOS ESTADOS PARA EL CRUD ---
+  // ✅ 2. Ya no necesitamos extraer el token manualmente
   const [formData, setFormData] = useState({ strNombrePerfil: '', bitAdministrador: false });
-  const [editingId, setEditingId] = useState(null); // Si tiene un ID, significa que estamos Editando
-  const [filtroTexto, setFiltroTexto] = useState(''); // Estado para la barra de búsqueda
+  const [editingId, setEditingId] = useState(null); 
+  const [filtroTexto, setFiltroTexto] = useState(''); 
 
-  // Referencia al botón de cerrar modal para ocultarlo automáticamente al guardar
   const closeModalBtn = useRef(null);
 
-  // 1. Cargar perfiles (Read)
   const fetchPerfiles = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/perfiles', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // ✅ 3. Petición GET súper limpia
+      const response = await api.get('/perfiles');
       setPerfiles(response.data);
     } catch (error) {
       console.error("Error al obtener perfiles:", error);
@@ -34,46 +31,36 @@ const Perfiles = () => {
   };
 
   useEffect(() => {
-    if (token) fetchPerfiles();
-  }, [token]);
+    fetchPerfiles();
+  }, []); // ✅ 4. Ya no dependemos del token en el useEffect
 
-  // 2. Guardar (Create / Update)
   const handleSave = async () => {
-    // Validación básica
     if (!formData.strNombrePerfil.trim()) {
       alert("El nombre del perfil es obligatorio");
       return;
     }
 
     try {
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      
+      // ✅ 5. Peticiones PUT y POST limpias y directas
       if (editingId) {
-        // EDITAR (PUT)
-        await axios.put(`/api/perfiles/${editingId}`, formData, config);
+        await api.put(`/perfiles/${editingId}`, formData);
       } else {
-        // CREAR (POST)
-        await axios.post('/api/perfiles', formData, config);
+        await api.post('/perfiles', formData);
       }
-      
-      // Recargamos la tabla y cerramos el modal
       fetchPerfiles();
       closeModalBtn.current.click();
       resetForm();
-
     } catch (error) {
       console.error("Error al guardar:", error);
       alert("Hubo un error al guardar el perfil.");
     }
   };
 
-  // 3. Eliminar (Delete)
   const handleDelete = async (id) => {
     if (window.confirm("¿Estás seguro de eliminar este perfil? Esto podría afectar a los usuarios que lo tengan asignado.")) {
       try {
-        await axios.delete(`/api/perfiles/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        // ✅ 6. Petición DELETE limpia
+        await api.delete(`/perfiles/${id}`);
         fetchPerfiles();
       } catch (error) {
         console.error("Error al eliminar:", error);
@@ -82,17 +69,14 @@ const Perfiles = () => {
     }
   };
 
-  // Prepara el modal para Editar o Crear
   const openModal = (perfil = null) => {
     if (perfil) {
-      // Modo Edición: Llenar el form con los datos de la BD
       setEditingId(perfil.id);
       setFormData({ 
-        strNombrePerfil: perfil.strnombreperfil, // Cuidado con mayúsculas/minúsculas de tu BD
+        strNombrePerfil: perfil.strnombreperfil, 
         bitAdministrador: perfil.bitadministrador 
       });
     } else {
-      // Modo Creación: Formulario en blanco
       resetForm();
     }
   };
@@ -102,7 +86,6 @@ const Perfiles = () => {
     setFormData({ strNombrePerfil: '', bitAdministrador: false });
   };
 
-  // --- Lógica de Búsqueda y Paginación ---
   const perfilesFiltrados = perfiles.filter(p => 
     p.strnombreperfil.toLowerCase().includes(filtroTexto.toLowerCase())
   );
@@ -115,7 +98,6 @@ const Perfiles = () => {
   return (
     <div className="container-fluid animate__animated animate__fadeIn">
       
-      {/* HEADER */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h3 className="fw-bold mb-0" style={{ color: 'var(--btn-pastel-pink)' }}>
@@ -127,13 +109,12 @@ const Perfiles = () => {
           className="btn btn-pastel-blue text-white fw-bold px-4 py-2 shadow-sm border-0 d-flex align-items-center"
           data-bs-toggle="modal" 
           data-bs-target="#perfilModal"
-          onClick={() => openModal()} // <-- Limpia el modal para crear uno nuevo
+          onClick={() => openModal()}
         >
           <Plus size={18} className="me-2" /> Nuevo Perfil
         </button>
       </div>
 
-      {/* TABLA DE PERFILES */}
       <div className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
         <div className="card-header bg-white border-bottom p-3">
           <div className="input-group w-25 ms-auto">
@@ -145,7 +126,7 @@ const Perfiles = () => {
               value={filtroTexto}
               onChange={(e) => {
                 setFiltroTexto(e.target.value);
-                setCurrentPage(1); // Regresa a la pág 1 al buscar
+                setCurrentPage(1);
               }}
             />
           </div>
@@ -155,8 +136,7 @@ const Perfiles = () => {
           <table className="table table-hover align-middle mb-0">
             <thead className="bg-light text-muted small text-uppercase">
               <tr>
-                <th className="ps-4">ID</th>
-                <th>Nombre del Perfil</th>
+                <th className="ps-4">Nombre del Perfil</th>
                 <th className="text-center">Admin Global</th>
                 <th className="text-center">Acciones</th>
               </tr>
@@ -165,8 +145,7 @@ const Perfiles = () => {
               {currentRows.length > 0 ? (
                 currentRows.map((p) => (
                   <tr key={p.id} className="border-bottom">
-                    <td className="ps-4 text-muted fw-bold">#{p.id}</td>
-                    <td><span className="fw-bold text-dark">{p.strnombreperfil}</span></td>
+                    <td className="ps-4"><span className="fw-bold text-dark">{p.strnombreperfil}</span></td>
                     <td className="text-center">
                       {p.bitadministrador ? 
                         <span className="badge bg-primary-subtle text-primary border-0 px-3">SÍ</span> : 
@@ -179,13 +158,13 @@ const Perfiles = () => {
                           className="btn btn-sm btn-light text-warning rounded-circle p-2 border-0 shadow-sm"
                           data-bs-toggle="modal" 
                           data-bs-target="#perfilModal"
-                          onClick={() => openModal(p)} // <-- Pasa los datos del perfil al modal
+                          onClick={() => openModal(p)}
                         >
                           <Edit3 size={16} />
                         </button>
                         <button 
                           className="btn btn-sm btn-light text-danger rounded-circle p-2 border-0 shadow-sm"
-                          onClick={() => handleDelete(p.id)} // <-- Llama a eliminar
+                          onClick={() => handleDelete(p.id)}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -194,13 +173,12 @@ const Perfiles = () => {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="4" className="text-center p-4 text-muted">No se encontraron perfiles.</td></tr>
+                <tr><td colSpan="3" className="text-center p-4 text-muted">No se encontraron perfiles.</td></tr>
               )}
             </tbody>
           </table>
         </div>
 
-        {/* PAGINACIÓN */}
         <div className="card-footer bg-white border-0 p-3 d-flex justify-content-between align-items-center">
           <span className="text-muted small">Mostrando {currentRows.length} de {perfilesFiltrados.length} roles</span>
           <nav>
@@ -219,7 +197,7 @@ const Perfiles = () => {
         </div>
       </div>
 
-      {/* --- MODAL CREAR/EDITAR PERFIL --- */}
+      {/* MODAL */}
       <div className="modal fade" id="perfilModal" tabIndex="-1" aria-hidden="true" data-bs-backdrop="static">
         <div className="modal-dialog modal-dialog-centered">
           <div className="modal-content border-0 shadow rounded-4">
@@ -261,7 +239,7 @@ const Perfiles = () => {
               <button 
                 type="button" 
                 className="btn btn-pastel-pink text-white rounded-3 px-4 shadow-sm fw-bold"
-                onClick={handleSave} // <-- Llama a Guardar
+                onClick={handleSave}
               >
                 {editingId ? 'Actualizar Cambios' : 'Guardar Perfil'}
               </button>

@@ -1,29 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, Edit, Trash2, PlusCircle, X, Save, MapPin } from 'lucide-react';
-import axios from 'axios';
+import { Layers, Edit, Trash2, PlusCircle, X, Save, MapPin, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FolderPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+// ✅ 1. Importamos nuestra API configurada
+import api from '../api'; 
 
 const Modulos = () => {
   const [modulos, setModulos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { token, user } = useAuth();
+  
+  // ✅ 2. Ya no sacamos el token de aquí, solo necesitamos al usuario para sus permisos
+  const { user } = useAuth();
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 5;
 
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   
   const [formData, setFormData] = useState({ strnombremodulo: '', ubicacion: 'Principal' });
+  const [nuevaCarpeta, setNuevaCarpeta] = useState('');
+  const [esNuevaCarpeta, setEsNuevaCarpeta] = useState(false);
 
-  // ✅ Mejoramos la búsqueda para que no falle por una letra o acento
   const permisos = user?.permisos?.find(p => {
     const nombreBD = p.strnombremodulo?.trim().toLowerCase();
-    return nombreBD === 'modulo' || nombreBD === 'modulos' || nombreBD === 'módulos';
+    return nombreBD === 'modulo' || nombreBD === 'modulos';
   }) || {};
+
+  const carpetasExistentes = [...new Set(modulos.map(m => m.ubicacion || 'Principal'))];
 
   const fetchModulos = async () => {
     try {
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      const res = await axios.get('/api/modulos', config);
+      // ✅ 3. Petición súper limpia usando api.get
+      const res = await api.get('/modulos');
       setModulos(res.data);
     } catch (error) {
       console.error("Error al cargar módulos:", error);
@@ -33,12 +43,19 @@ const Modulos = () => {
   };
 
   useEffect(() => {
-    if (token) fetchModulos();
-  }, [token]);
+    fetchModulos();
+  }, []); // Ya no dependemos del token en el useEffect
+
+  const indexOfLastRow = currentPage * rowsPerPage;
+  const indexOfFirstRow = indexOfLastRow - rowsPerPage;
+  const currentRows = modulos.slice(indexOfFirstRow, indexOfLastRow);
+  const totalPages = Math.ceil(modulos.length / rowsPerPage);
 
   const abrirModalCrear = () => {
     setIsEditing(false);
     setCurrentId(null);
+    setEsNuevaCarpeta(false);
+    setNuevaCarpeta('');
     setFormData({ strnombremodulo: '', ubicacion: 'Principal' }); 
     setShowModal(true);
   };
@@ -46,6 +63,8 @@ const Modulos = () => {
   const abrirModalEditar = (modulo) => {
     setIsEditing(true);
     setCurrentId(modulo.id);
+    setEsNuevaCarpeta(false);
+    setNuevaCarpeta('');
     setFormData({ 
       strnombremodulo: modulo.strnombremodulo, 
       ubicacion: modulo.ubicacion || 'Principal' 
@@ -56,40 +75,47 @@ const Modulos = () => {
   const cerrarModal = () => {
     setShowModal(false);
     setFormData({ strnombremodulo: '', ubicacion: 'Principal' });
+    setNuevaCarpeta('');
+    setEsNuevaCarpeta(false);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.strnombremodulo.trim()) return alert("El nombre del módulo es obligatorio");
+    
+    const ubicacionFinal = esNuevaCarpeta ? nuevaCarpeta.trim() : formData.ubicacion;
+
+    if (esNuevaCarpeta && !ubicacionFinal) return alert("Escribe el nombre de la nueva carpeta");
 
     try {
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      
+      const dataToSend = { ...formData, ubicacion: ubicacionFinal };
+
+      // ✅ 4. Peticiones PUT y POST limpias, sin variables config
       if (isEditing) {
-        await axios.put(`/api/modulos/${currentId}`, formData, config);
+        await api.put(`/modulos/${currentId}`, dataToSend);
       } else {
-        await axios.post('/api/modulos', formData, config);
+        await api.post('/modulos', dataToSend);
       }
       
       cerrarModal();
       fetchModulos(); 
     } catch (error) {
-      alert("Error al guardar. Verifica que el módulo exista.");
+      console.error("Error al guardar:", error);
+      alert("Error al guardar.");
     }
   };
 
   const handleEliminar = async (id, nombre) => {
     const confirmar = window.confirm(`⚠️ ¿Deseas eliminar el módulo "${nombre}"?`);
     if (!confirmar) return;
-
     try {
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      // ✅ URL RELATIVA PARA VERCEL
-      await axios.delete(`/api/modulos/${id}`, config);
+      // ✅ 5. Petición DELETE limpia
+      await api.delete(`/modulos/${id}`);
+      
       fetchModulos(); 
+      if (currentRows.length === 1 && currentPage > 1) setCurrentPage(currentPage - 1);
     } catch (error) {
-      console.error("Error al eliminar:", error);
-      alert("Error 404: No se pudo encontrar la ruta de borrado. Verifica el backend.");
+      alert("No se pudo eliminar el módulo.");
     }
   };
 
@@ -97,11 +123,13 @@ const Modulos = () => {
 
   return (
     <div className="container-fluid animate__animated animate__fadeIn position-relative">
+      
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h3 className="fw-bold mb-0" style={{ color: '#2c3e50' }}>Gestión de Módulos</h3>
-          <p className="text-muted small">Configura las secciones y su ubicación en el menú.</p>
+          <p className="text-muted small">Configura las secciones y sus carpetas en el menú.</p>
         </div>
+        
         {permisos.bitagregar && (
           <button 
             className="btn text-white px-4 shadow-sm fw-bold rounded-pill d-flex align-items-center" 
@@ -118,17 +146,15 @@ const Modulos = () => {
           <table className="table table-hover align-middle mb-0">
             <thead className="bg-light text-muted small text-uppercase">
               <tr>
-                {/* ID TOTALMENTE OCULTO */}
                 <th className="ps-4 py-3">Módulo</th>
-                <th>Ubicación</th>
+                <th>Carpeta / Ubicación</th>
                 <th className="text-center">Estado</th>
                 <th className="text-end pe-4">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {modulos.map((m) => (
+              {currentRows.map((m) => (
                 <tr key={m.id} className="border-bottom">
-                  {/* ID TOTALMENTE OCULTO */}
                   <td className="ps-4">
                     <div className="d-flex align-items-center gap-3">
                       <div className="p-2 rounded-3 bg-light text-primary"><Layers size={18} /></div>
@@ -162,8 +188,25 @@ const Modulos = () => {
             </tbody>
           </table>
         </div>
+
+        {/* PAGINACIÓN */}
+        <div className="card-footer bg-white border-0 p-3 d-flex justify-content-between align-items-center">
+          <div className="d-flex gap-1">
+            <button className="btn btn-outline-secondary btn-sm rounded-circle border-0" disabled={currentPage === 1} onClick={() => setCurrentPage(1)}><ChevronsLeft size={18}/></button>
+            <button className="btn btn-outline-secondary btn-sm rounded-circle border-0" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}><ChevronLeft size={18}/></button>
+          </div>
+          <span className="badge rounded-circle d-flex align-items-center justify-content-center shadow-sm" 
+                style={{ backgroundColor: 'var(--btn-pastel-blue)', color: 'white', width: '32px', height: '32px', fontSize: '14px' }}>
+            {currentPage}
+          </span>
+          <div className="d-flex gap-1">
+            <button className="btn btn-outline-secondary btn-sm rounded-circle border-0" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)}><ChevronRight size={18}/></button>
+            <button className="btn btn-outline-secondary btn-sm rounded-circle border-0" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(totalPages)}><ChevronsRight size={18}/></button>
+          </div>
+        </div>
       </div>
 
+      {/* --- MODAL DINÁMICO --- */}
       {showModal && (
         <div className="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
           <div className="card border-0 shadow-lg rounded-4 animate__animated animate__zoomIn" style={{ width: '400px', maxWidth: '90%' }}>
@@ -171,31 +214,59 @@ const Modulos = () => {
               <h5 className="fw-bold mb-0">{isEditing ? 'Editar Módulo' : 'Crear Módulo'}</h5>
               <button className="btn btn-sm btn-light rounded-circle" onClick={cerrarModal}><X size={20} /></button>
             </div>
+            
             <form onSubmit={handleSubmit}>
               <div className="card-body p-4">
                 <div className="mb-3">
-                  <label className="form-label text-muted small fw-bold">Nombre del Módulo</label>
+                  <label className="form-label text-muted small fw-bold">Nombre del Módulo (Pantalla)</label>
                   <input 
                     type="text" 
                     className="form-control bg-light border-0 p-3 rounded-3 mb-3" 
-                    placeholder="Ej. Principal 1.3"
+                    placeholder="Ej. Reportes de Ventas"
                     value={formData.strnombremodulo}
                     onChange={(e) => setFormData({ ...formData, strnombremodulo: e.target.value })}
                     required
                   />
-                  <label className="form-label text-muted small fw-bold">Ubicación en el Menú</label>
+
+                  <label className="form-label text-muted small fw-bold">Carpeta (Ubicación)</label>
                   <select 
-                    className="form-select bg-light border-0 p-3 rounded-3"
-                    value={formData.ubicacion}
-                    onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
+                    className="form-select bg-light border-0 p-3 rounded-3 mb-2"
+                    value={esNuevaCarpeta ? "NUEVA" : formData.ubicacion}
+                    onChange={(e) => {
+                      if (e.target.value === "NUEVA") {
+                        setEsNuevaCarpeta(true);
+                      } else {
+                        setEsNuevaCarpeta(false);
+                        setFormData({ ...formData, ubicacion: e.target.value });
+                      }
+                    }}
                   >
-                    <option value="Principal">Nivel Principal</option>
-                    <option value="Seguridad">Menú Seguridad</option>
-                    <option value="Principal 1">Principal 1</option>
-                    <option value="Principal 2">Principal 2</option>
+                    {carpetasExistentes.map(carpeta => (
+                      <option key={carpeta} value={carpeta}>{carpeta}</option>
+                    ))}
+                    <option value="NUEVA" className="fw-bold text-primary">+ --- Crear nueva carpeta ---</option>
                   </select>
+
+                  {/* Campo extra si decide crear una carpeta nueva */}
+                  {esNuevaCarpeta && (
+                    <div className="animate__animated animate__fadeIn">
+                      <div className="d-flex align-items-center gap-2 mb-1 text-primary">
+                        <FolderPlus size={14} />
+                        <label className="small fw-bold">Nombre de la nueva carpeta</label>
+                      </div>
+                      <input 
+                        type="text" 
+                        className="form-control border-primary bg-white p-3 rounded-3" 
+                        placeholder="Ej. Recursos Humanos"
+                        value={nuevaCarpeta}
+                        onChange={(e) => setNuevaCarpeta(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
+              
               <div className="card-footer bg-white border-top-0 pb-4 px-4 d-flex gap-2">
                 <button type="button" className="btn btn-light w-50 rounded-pill fw-bold" onClick={cerrarModal}>Cancelar</button>
                 <button type="submit" className="btn text-white w-50 rounded-pill fw-bold d-flex align-items-center justify-content-center" style={{ backgroundColor: 'var(--btn-pastel-blue)' }}>
@@ -206,6 +277,7 @@ const Modulos = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

@@ -13,35 +13,34 @@ const checkPermission = require('../middlewares/checkPermission');
 
 /**
  * RUTAS DE GESTIÓN DE MÓDULOS
- * Ajustamos el nombre a 'modulos' (minúsculas) para que coincida con 
- * el estándar de tu base de datos y evitar el error 404.
+ * Módulo requerido en la BD: "Modulo"
  */
 
 // 1. Ver Módulos (Requiere bitconsulta)
 router.get('/', 
   verifyToken, 
-  checkPermission('modulos', 'bitconsulta'), // Cambiado a 'modulos'
+  checkPermission('Modulo', 'bitconsulta'), 
   getModulos
 );
 
 // 2. Crear Módulo (Requiere bitagregar)
 router.post('/', 
   verifyToken, 
-  checkPermission('modulos', 'bitagregar'), // Cambiado a 'modulos'
+  checkPermission('Modulo', 'bitagregar'), 
   createModulo
 );
 
 // 3. Editar Módulo (Requiere biteditar)
 router.put('/:id', 
   verifyToken, 
-  checkPermission('modulos', 'biteditar'), // Cambiado a 'modulos'
+  checkPermission('Modulo', 'biteditar'), 
   updateModulo
 );
 
 // 4. Eliminar Módulo (Requiere biteliminar)
 router.delete('/:id', 
   verifyToken, 
-  checkPermission('modulos', 'biteliminar'), // Cambiado a 'modulos'
+  checkPermission('Modulo', 'biteliminar'), 
   deleteModulo
 );
 

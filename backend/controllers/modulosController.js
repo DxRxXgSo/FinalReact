@@ -4,39 +4,34 @@ const pool = require('../config/db');
 const getModulos = async (req, res) => {
   try {
     const query = `
-      SELECT id, strnombremodulo, ubicacion 
-      FROM modulo 
+      SELECT id, strNombreModulo as strnombremodulo, ubicacion 
+      FROM Modulo 
       ORDER BY id ASC
     `;
     const result = await pool.query(query);
     res.json(result.rows);
   } catch (error) {
-    console.error("❌ Error al obtener módulos:", error);
+    console.error("Error al obtener módulos:", error);
     res.status(500).json({ message: "Error interno al obtener los módulos" });
   }
 };
 
 // 2. Crear un nuevo módulo
 const createModulo = async (req, res) => {
-  // Aceptamos ambas nomenclaturas para evitar errores de redacción
   const { strNombreModulo, strnombremodulo, ubicacion } = req.body;
   const nombreFinal = strNombreModulo || strnombremodulo;
 
-  if (!nombreFinal) {
-    return res.status(400).json({ message: "El nombre del módulo es obligatorio" });
-  }
-
   try {
     const query = `
-      INSERT INTO modulo (strnombremodulo, ubicacion) 
+      INSERT INTO Modulo (strNombreModulo, ubicacion) 
       VALUES ($1, $2) 
-      RETURNING *
+      RETURNING id, strNombreModulo as strnombremodulo, ubicacion
     `;
     const result = await pool.query(query, [nombreFinal, ubicacion || 'Principal']);
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error("❌ Error al crear módulo:", error);
-    res.status(500).json({ message: "Error al insertar el módulo en la base de datos" });
+    console.error("Error al crear módulo:", error);
+    res.status(500).json({ message: "Error al crear el módulo" });
   }
 };
 
@@ -48,51 +43,42 @@ const updateModulo = async (req, res) => {
 
   try {
     const query = `
-      UPDATE modulo 
-      SET strnombremodulo = $1, ubicacion = $2
+      UPDATE Modulo 
+      SET strNombreModulo = $1, ubicacion = $2
       WHERE id = $3 
-      RETURNING *
+      RETURNING id, strNombreModulo as strnombremodulo, ubicacion
     `;
     const result = await pool.query(query, [nombreFinal, ubicacion || 'Principal', id]);
     
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: "Módulo no encontrado para actualizar" });
+      return res.status(404).json({ message: "Módulo no encontrado" });
     }
     res.json(result.rows[0]);
   } catch (error) {
-    console.error("❌ Error al actualizar módulo:", error);
+    console.error("Error al actualizar módulo:", error);
     res.status(500).json({ message: "Error al actualizar el módulo" });
   }
 };
 
-// 4. Eliminar un módulo
+// 4. Eliminar un módulo (FIX ERROR 500)
 const deleteModulo = async (req, res) => {
   const { id } = req.params;
-
-  // Debug para ver qué ID está llegando a Vercel
-  console.log(`Intentando eliminar módulo con ID: ${id}`);
-
   try {
-    const query = `DELETE FROM modulo WHERE id = $1 RETURNING *`;
-    const result = await pool.query(query, [id]);
+    // ✅ PASO A: Borramos primero la dependencia en PermisosPerfil
+    // Esto evita que Postgres lance el error de llave foránea (Error 500)
+    await pool.query('DELETE FROM PermisosPerfil WHERE idModulo = $1', [id]);
+
+    // ✅ PASO B: Ahora sí borramos el módulo de la tabla principal
+    const result = await pool.query('DELETE FROM Modulo WHERE id = $1 RETURNING *', [id]);
 
     if (result.rows.length === 0) {
-      // Si entra aquí, es que la ruta se encontró pero el ID no existe en la BD
-      return res.status(404).json({ message: "El módulo con ese ID no existe." });
+      return res.status(404).json({ message: "Módulo no encontrado" });
     }
 
-    res.json({ message: "Módulo eliminado correctamente" });
+    res.json({ message: "Módulo y sus permisos eliminados correctamente" });
   } catch (error) {
-    console.error("❌ Error al eliminar módulo:", error);
-    
-    // Error 23503 es 'Foreign Key Violation' en PostgreSQL
-    if (error.code === '23503') {
-      return res.status(400).json({ 
-        message: "No se puede eliminar: Este módulo está siendo usado en la Matriz de Permisos. Primero borra los permisos asociados a este módulo." 
-      });
-    }
-    
-    res.status(500).json({ message: "Error interno al intentar eliminar el módulo" });
+    console.error("Error crítico al eliminar módulo:", error);
+    res.status(500).json({ message: "No se pudo eliminar el módulo. Revisa los logs del servidor." });
   }
 };
 
