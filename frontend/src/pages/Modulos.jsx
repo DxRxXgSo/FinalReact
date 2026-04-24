@@ -244,7 +244,7 @@ const Modulos = () => {
                     {carpetasExistentes.map(carpeta => (
                       <option key={carpeta} value={carpeta}>{carpeta}</option>
                     ))}
-                    <option value="NUEVA" className="fw-bold text-primary">+ --- Crear nueva carpeta ---</option>
+                    
                   </select>
 
                   {/* Campo extra si decide crear una carpeta nueva */}
