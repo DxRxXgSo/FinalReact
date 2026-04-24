@@ -1,10 +1,10 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
+// ✅ 1. IMPORTANTE: Usamos TU configuración de api, no axios directamente
+import api from '../api'; 
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  // 1. Inicialización de estados desde localStorage
   const [token, setToken] = useState(() => localStorage.getItem('token') || null);
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('user');
@@ -19,37 +19,30 @@ export const AuthProvider = ({ children }) => {
   const syncPermissions = async () => {
     if (!token) return;
     try {
-      const res = await axios.get('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // ✅ 2. Usamos 'api.get'. 
+      // Ya no necesitas poner '/api' ni enviar los headers manualmente, 
+      // porque tu archivo api.js YA LO HACE por ti.
+      const res = await api.get('/auth/me');
       
       const newData = JSON.stringify(res.data);
       const oldData = localStorage.getItem('user');
       
-      // Solo actualizamos si hay cambios reales para evitar bucles de renderizado
       if (newData !== oldData) {
         console.log("🚀 Sincronización: Permisos actualizados desde la BD");
         setUser(res.data);
         localStorage.setItem('user', newData);
       }
     } catch (error) {
-      // Si el servidor responde 401 (token expirado) o 403, sacamos al usuario
       if (error.response?.status === 401 || error.response?.status === 403) {
         logout();
       }
     }
   };
 
-  // ✅ EFECTO PARA TIEMPO REAL (REVISIÓN CADA 3 SEGUNDOS)
   useEffect(() => {
     if (token) {
-      // Sincroniza de inmediato al cargar
       syncPermissions();
-
-      // Crea el intervalo para revisar cada 3 segundos
       const interval = setInterval(syncPermissions, 3000);
-      
-      // Limpia el intervalo cuando el componente se destruye
       return () => clearInterval(interval);
     }
   }, [token]);
