@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, Edit, Trash2, PlusCircle, X, Save, MapPin, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FolderPlus } from 'lucide-react';
+import { Layers, Edit, Trash2, PlusCircle, X, Save, MapPin, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 // ✅ 1. Importamos nuestra API configurada
@@ -20,8 +20,6 @@ const Modulos = () => {
   const [currentId, setCurrentId] = useState(null);
   
   const [formData, setFormData] = useState({ strnombremodulo: '', ubicacion: 'Principal' });
-  const [nuevaCarpeta, setNuevaCarpeta] = useState('');
-  const [esNuevaCarpeta, setEsNuevaCarpeta] = useState(false);
 
   const permisos = user?.permisos?.find(p => {
     const nombreBD = p.strnombremodulo?.trim().toLowerCase();
@@ -54,8 +52,6 @@ const Modulos = () => {
   const abrirModalCrear = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setEsNuevaCarpeta(false);
-    setNuevaCarpeta('');
     setFormData({ strnombremodulo: '', ubicacion: 'Principal' }); 
     setShowModal(true);
   };
@@ -63,8 +59,6 @@ const Modulos = () => {
   const abrirModalEditar = (modulo) => {
     setIsEditing(true);
     setCurrentId(modulo.id);
-    setEsNuevaCarpeta(false);
-    setNuevaCarpeta('');
     setFormData({ 
       strnombremodulo: modulo.strnombremodulo, 
       ubicacion: modulo.ubicacion || 'Principal' 
@@ -75,17 +69,13 @@ const Modulos = () => {
   const cerrarModal = () => {
     setShowModal(false);
     setFormData({ strnombremodulo: '', ubicacion: 'Principal' });
-    setNuevaCarpeta('');
-    setEsNuevaCarpeta(false);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.strnombremodulo.trim()) return alert("El nombre del módulo es obligatorio");
     
-    const ubicacionFinal = esNuevaCarpeta ? nuevaCarpeta.trim() : formData.ubicacion;
-
-    if (esNuevaCarpeta && !ubicacionFinal) return alert("Escribe el nombre de la nueva carpeta");
+    const ubicacionFinal = formData.ubicacion;
 
     try {
       const dataToSend = { ...formData, ubicacion: ubicacionFinal };
@@ -231,39 +221,13 @@ const Modulos = () => {
                   <label className="form-label text-muted small fw-bold">Carpeta (Ubicación)</label>
                   <select 
                     className="form-select bg-light border-0 p-3 rounded-3 mb-2"
-                    value={esNuevaCarpeta ? "NUEVA" : formData.ubicacion}
-                    onChange={(e) => {
-                      if (e.target.value === "NUEVA") {
-                        setEsNuevaCarpeta(true);
-                      } else {
-                        setEsNuevaCarpeta(false);
-                        setFormData({ ...formData, ubicacion: e.target.value });
-                      }
-                    }}
+                    value={formData.ubicacion}
+                    onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
                   >
                     {carpetasExistentes.map(carpeta => (
                       <option key={carpeta} value={carpeta}>{carpeta}</option>
                     ))}
-                    
                   </select>
-
-                  {/* Campo extra si decide crear una carpeta nueva */}
-                  {esNuevaCarpeta && (
-                    <div className="animate__animated animate__fadeIn">
-                      <div className="d-flex align-items-center gap-2 mb-1 text-primary">
-                        <FolderPlus size={14} />
-                        <label className="small fw-bold">Nombre de la nueva carpeta</label>
-                      </div>
-                      <input 
-                        type="text" 
-                        className="form-control border-primary bg-white p-3 rounded-3" 
-                        placeholder="Ej. Recursos Humanos"
-                        value={nuevaCarpeta}
-                        onChange={(e) => setNuevaCarpeta(e.target.value)}
-                        autoFocus
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
               

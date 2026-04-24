@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 
-// 1. Obtener todos los módulos
+// 1. Obtener todos los módulos (Respetando tus alias y tabla "Modulo")
 const getModulos = async (req, res) => {
   try {
     const query = `
@@ -16,22 +16,44 @@ const getModulos = async (req, res) => {
   }
 };
 
-// 2. Crear un nuevo módulo
+// 2. Crear un nuevo módulo + Permisos automáticos para Admin
 const createModulo = async (req, res) => {
   const { strNombreModulo, strnombremodulo, ubicacion } = req.body;
   const nombreFinal = strNombreModulo || strnombremodulo;
+  
+  const client = await pool.connect(); 
 
   try {
-    const query = `
+    await client.query('BEGIN'); // Iniciamos transacción
+
+    // PASO A: Insertar el nuevo módulo
+    const queryModulo = `
       INSERT INTO Modulo (strNombreModulo, ubicacion) 
       VALUES ($1, $2) 
       RETURNING id, strNombreModulo as strnombremodulo, ubicacion
     `;
-    const result = await pool.query(query, [nombreFinal, ubicacion || 'Principal']);
-    res.status(201).json(result.rows[0]);
+    const resultModulo = await client.query(queryModulo, [nombreFinal, ubicacion || 'Principal']);
+    const nuevoModulo = resultModulo.rows[0];
+
+    // PASO B: Asignar permisos totales al perfil ADMIN (ID 1)
+    // ✅ CORRECCIÓN: Usamos bitConsulta en lugar de bitLeer
+    const queryPermisos = `
+      INSERT INTO PermisosPerfil (idPerfil, idModulo, bitConsulta, bitAgregar, bitEditar, bitEliminar) 
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `;
+    
+    // Asignamos todo en true para el Admin (ID 1)
+    await client.query(queryPermisos, [1, nuevoModulo.id, true, true, true, true]);
+
+    await client.query('COMMIT'); 
+    res.status(201).json(nuevoModulo);
+
   } catch (error) {
-    console.error("Error al crear módulo:", error);
-    res.status(500).json({ message: "Error al crear el módulo" });
+    await client.query('ROLLBACK'); 
+    console.error("Error crítico al crear módulo:", error);
+    res.status(500).json({ message: "No se pudo crear el módulo. Revisa los nombres de las columnas." });
+  } finally {
+    client.release();
   }
 };
 
@@ -60,15 +82,14 @@ const updateModulo = async (req, res) => {
   }
 };
 
-// 4. Eliminar un módulo (FIX ERROR 500)
+// 4. Eliminar un módulo (Manteniendo tu Fix de dependencias)
 const deleteModulo = async (req, res) => {
   const { id } = req.params;
   try {
-    // ✅ PASO A: Borramos primero la dependencia en PermisosPerfil
-    // Esto evita que Postgres lance el error de llave foránea (Error 500)
+    // Borramos primero la dependencia en PermisosPerfil
     await pool.query('DELETE FROM PermisosPerfil WHERE idModulo = $1', [id]);
 
-    // ✅ PASO B: Ahora sí borramos el módulo de la tabla principal
+    // Borramos el módulo de la tabla principal
     const result = await pool.query('DELETE FROM Modulo WHERE id = $1 RETURNING *', [id]);
 
     if (result.rows.length === 0) {
@@ -78,7 +99,7 @@ const deleteModulo = async (req, res) => {
     res.json({ message: "Módulo y sus permisos eliminados correctamente" });
   } catch (error) {
     console.error("Error crítico al eliminar módulo:", error);
-    res.status(500).json({ message: "No se pudo eliminar el módulo. Revisa los logs del servidor." });
+    res.status(500).json({ message: "No se pudo eliminar el módulo." });
   }
 };
 
