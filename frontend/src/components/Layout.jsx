@@ -40,7 +40,11 @@ const Layout = ({ children }) => {
 
   if (user?.permisos) {
     user.permisos.forEach(p => {
+      // 🛡️ REGLA 1: Si no tiene permiso de ver (consulta), lo ignoramos
       if (!p.bitconsulta) return; 
+
+      // 🛡️ REGLA 2: Si el módulo está INACTIVO globalmente, lo ocultamos
+      if (p.bitactivo === false) return; 
 
       const nombreLow = p.strnombremodulo?.trim().toLowerCase();
       const ubi = p.ubicacion?.trim();
@@ -127,17 +131,14 @@ const Layout = ({ children }) => {
             <div className="d-flex align-items-center gap-3 ms-auto border-start ps-4">
               <div className="text-end d-none d-md-block">
                 <div className="fw-bold small" style={{ color: 'var(--btn-pastel-blue)' }}>
-                  {/* Lee el nombre del usuario */}
                   {user?.strnombreusuario || user?.nombre || 'Usuario'}
                 </div>
                 <div className="text-muted text-uppercase" style={{ fontSize: '10px' }}>
-                  {/* Lee el perfil del usuario */}
                   {user?.strnombreperfil || user?.perfil || 'Sin Perfil'}
                 </div>
               </div>
               
               <div className="dropdown">
-                {/* ✅ AVATAR DINÁMICO */}
                 <div className="rounded-circle d-flex align-items-center justify-content-center cursor-pointer shadow-sm border overflow-hidden bg-light" 
                      style={{ width: '40px', height: '40px' }} 
                      data-bs-toggle="dropdown">
@@ -148,7 +149,6 @@ const Layout = ({ children }) => {
                   )}
                 </div>
                 <ul className="dropdown-menu dropdown-menu-end border-0 shadow mt-3">
-                  {/* ✅ OPCIÓN A MI CONFIGURACIÓN */}
                   <li>
                     <Link to="/mi-perfil" className="dropdown-item d-flex align-items-center py-2 fw-medium">
                       <Settings size={16} className="me-2 text-primary" /> Mi Configuración

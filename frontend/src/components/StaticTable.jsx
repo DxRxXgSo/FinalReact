@@ -26,12 +26,12 @@ const StaticTable = ({ title, moduloName }) => {
 
   // --- LÓGICA SIMULADA ---
 
-  // 🔍 Buscar (Corregido para no buscar por ID inexistente)
+  // 🔍 Buscar
   const filteredData = data.filter(item => 
     item.nombre.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 🗑️ Eliminar (Usa el ID interno)
+  // 🗑️ Eliminar
   const handleDelete = (id) => {
     if (window.confirm("¿Simular eliminación de este registro?")) {
       setData(data.filter(item => item.id !== id));
@@ -58,7 +58,7 @@ const StaticTable = ({ title, moduloName }) => {
     } else {
       const newItem = {
         ...formData,
-        id: Date.now(), // Genera un ID interno único
+        id: Date.now(), 
         fecha: new Date().toISOString().split('T')[0]
       };
       setData([...data, newItem]);
@@ -116,7 +116,6 @@ const StaticTable = ({ title, moduloName }) => {
             <tbody>
               {filteredData.length > 0 ? filteredData.map((item) => (
                 <tr key={item.id} className="border-bottom">
-                  {/* Celda de Nombre con padding inicial */}
                   <td className="ps-4">
                     <div className="fw-bold text-dark">{item.nombre}</div>
                     <div className="text-muted" style={{ fontSize: '10px' }}>Ref: {item.id}</div>
@@ -152,7 +151,7 @@ const StaticTable = ({ title, moduloName }) => {
         </div>
       </div>
 
-      {/* --- MODAL (Se mantiene igual) --- */}
+      {/* --- MODAL --- */}
       {showModal && (
         <div className="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style={{ backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 2000 }}>
           <div className="card border-0 shadow-lg rounded-4 animate__animated animate__zoomIn" style={{ width: '400px' }}>
@@ -168,11 +167,21 @@ const StaticTable = ({ title, moduloName }) => {
                 <label className="form-label small fw-bold">Descripción</label>
                 <textarea className="form-control mb-3 bg-light border-0 shadow-none" rows="3" value={formData.desc} onChange={(e) => setFormData({...formData, desc: e.target.value})} />
 
-                <label className="form-label small fw-bold">Estado</label>
-                <select className="form-select bg-light border-0 shadow-none" value={formData.estado} onChange={(e) => setFormData({...formData, estado: e.target.value})}>
-                  <option value="Activo">Activo</option>
-                  <option value="Inactivo">Inactivo</option>
-                </select>
+                {/* ✅ Switch Estilizado en lugar del Select */}
+                <div className="d-flex align-items-center justify-content-between p-3 rounded-4 border bg-white shadow-sm mt-3" style={{borderLeft: '4px solid var(--btn-pastel-blue) !important'}}>
+                  <div>
+                    <div className="fw-bold small">Estado del Elemento</div>
+                    <div className="text-muted" style={{fontSize: '11px'}}>Habilita o deshabilita este registro</div>
+                  </div>
+                  <div className="form-check form-switch custom-switch-md mb-0">
+                    <input className="form-check-input" 
+                           type="checkbox" 
+                           role="switch" 
+                           checked={formData.estado === 'Activo'} 
+                           onChange={e => setFormData({...formData, estado: e.target.checked ? 'Activo' : 'Inactivo'})} />
+                  </div>
+                </div>
+
               </div>
               <div className="card-footer bg-white border-0 pb-4 px-4 d-flex gap-2">
                 <button type="button" className="btn btn-light w-50 rounded-pill fw-bold" onClick={() => setShowModal(false)}>Cancelar</button>
@@ -182,6 +191,13 @@ const StaticTable = ({ title, moduloName }) => {
           </div>
         </div>
       )}
+
+      {/* Estilos para el switch */}
+      <style>{`
+        .custom-switch-md .form-check-input { width: 3em; height: 1.5em; cursor: pointer; margin-top: 0; }
+        .form-check-input:checked { background-color: #2ecc71 !important; border-color: #2ecc71 !important; }
+      `}</style>
+
     </div>
   );
 };

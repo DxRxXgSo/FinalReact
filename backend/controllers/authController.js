@@ -43,10 +43,12 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Contraseña incorrecta" });
     }
 
+    // ✅ CORRECCIÓN: Agregamos m.bitactivo AS bitactivo a la consulta
     const permisosQuery = `
       SELECT 
         m.strNombreModulo AS strnombremodulo, 
         m.ubicacion AS ubicacion,
+        m.bitactivo AS bitactivo,
         pp.bitAgregar AS bitagregar, 
         pp.bitEditar AS biteditar, 
         pp.bitConsulta AS bitconsulta, 
@@ -107,10 +109,12 @@ const getMe = async (req, res) => {
 
     const user = userResult.rows[0];
 
+    // ✅ CORRECCIÓN: Agregamos m.bitactivo AS bitactivo a la consulta
     const permisosQuery = `
       SELECT 
         m.strNombreModulo AS strnombremodulo, 
         m.ubicacion AS ubicacion,
+        m.bitactivo AS bitactivo,
         pp.bitAgregar AS bitagregar, 
         pp.bitEditar AS biteditar, 
         pp.bitConsulta AS bitconsulta, 

@@ -9,7 +9,6 @@ const Modulos = () => {
   const [modulos, setModulos] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // ✅ 2. Ya no sacamos el token de aquí, solo necesitamos al usuario para sus permisos
   const { user } = useAuth();
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -19,9 +18,9 @@ const Modulos = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   
-  const [formData, setFormData] = useState({ strnombremodulo: '', ubicacion: 'Principal' });
+  // ✅ Agregamos 'bitactivo' al estado inicial (por defecto true)
+  const [formData, setFormData] = useState({ strnombremodulo: '', ubicacion: 'Principal', bitactivo: true });
   
-  // ✅ ESTADO NUEVO: Para guardar el módulo seleccionado para ver detalles
   const [selectedModulo, setSelectedModulo] = useState(null);
 
   const permisos = user?.permisos?.find(p => {
@@ -33,7 +32,6 @@ const Modulos = () => {
 
   const fetchModulos = async () => {
     try {
-      // ✅ 3. Petición súper limpia usando api.get
       const res = await api.get('/modulos');
       setModulos(res.data);
     } catch (error) {
@@ -45,7 +43,7 @@ const Modulos = () => {
 
   useEffect(() => {
     fetchModulos();
-  }, []); // Ya no dependemos del token en el useEffect
+  }, []); 
 
   const indexOfLastRow = currentPage * rowsPerPage;
   const indexOfFirstRow = indexOfLastRow - rowsPerPage;
@@ -55,7 +53,7 @@ const Modulos = () => {
   const abrirModalCrear = () => {
     setIsEditing(false);
     setCurrentId(null);
-    setFormData({ strnombremodulo: '', ubicacion: 'Principal' }); 
+    setFormData({ strnombremodulo: '', ubicacion: 'Principal', bitactivo: true }); 
     setShowModal(true);
   };
 
@@ -64,30 +62,28 @@ const Modulos = () => {
     setCurrentId(modulo.id);
     setFormData({ 
       strnombremodulo: modulo.strnombremodulo, 
-      ubicacion: modulo.ubicacion || 'Principal' 
+      ubicacion: modulo.ubicacion || 'Principal',
+      // ✅ Cargamos el estado real del módulo (si es undefined, asumimos true)
+      bitactivo: modulo.bitactivo !== false 
     });
     setShowModal(true);
   };
 
   const cerrarModal = () => {
     setShowModal(false);
-    setFormData({ strnombremodulo: '', ubicacion: 'Principal' });
+    setFormData({ strnombremodulo: '', ubicacion: 'Principal', bitactivo: true });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.strnombremodulo.trim()) return alert("El nombre del módulo es obligatorio");
     
-    const ubicacionFinal = formData.ubicacion;
-
     try {
-      const dataToSend = { ...formData, ubicacion: ubicacionFinal };
-
-      // ✅ 4. Peticiones PUT y POST limpias, sin variables config
+      // ✅ Enviamos la data completa, incluyendo bitactivo
       if (isEditing) {
-        await api.put(`/modulos/${currentId}`, dataToSend);
+        await api.put(`/modulos/${currentId}`, formData);
       } else {
-        await api.post('/modulos', dataToSend);
+        await api.post('/modulos', formData);
       }
       
       cerrarModal();
@@ -102,9 +98,7 @@ const Modulos = () => {
     const confirmar = window.confirm(`⚠️ ¿Deseas eliminar el módulo "${nombre}"?`);
     if (!confirmar) return;
     try {
-      // ✅ 5. Petición DELETE limpia
       await api.delete(`/modulos/${id}`);
-      
       fetchModulos(); 
       if (currentRows.length === 1 && currentPage > 1) setCurrentPage(currentPage - 1);
     } catch (error) {
@@ -112,7 +106,6 @@ const Modulos = () => {
     }
   };
 
-  // ✅ FUNCIÓN NUEVA: Genera una descripción dinámica según el nombre del módulo
   const generarDescripcion = (nombre) => {
     if (!nombre) return '';
     const n = nombre.toLowerCase();
@@ -170,12 +163,16 @@ const Modulos = () => {
                     </span>
                   </td>
                   <td className="text-center">
-                    <span className="badge bg-success-subtle text-success rounded-pill px-3">Activo</span>
+                    {/* ✅ Lógica condicional para el estado */}
+                    {m.bitactivo !== false ? (
+                      <span className="badge bg-success-subtle text-success rounded-pill px-3">Activo</span>
+                    ) : (
+                      <span className="badge bg-danger-subtle text-danger rounded-pill px-3">Inactivo</span>
+                    )}
                   </td>
                   <td className="text-end pe-4">
                     <div className="d-flex justify-content-end gap-2">
                       
-                      {/* ✅ CONDICIÓN NUEVA: bitdetalle */}
                       {permisos.bitdetalle && (
                         <button className="btn btn-sm btn-light text-primary border shadow-sm" 
                                 data-bs-toggle="modal" data-bs-target="#moduloDetalleModal" 
@@ -244,7 +241,7 @@ const Modulos = () => {
 
                   <label className="form-label text-muted small fw-bold">Carpeta (Ubicación)</label>
                   <select 
-                    className="form-select bg-light border-0 p-3 rounded-3 mb-2"
+                    className="form-select bg-light border-0 p-3 rounded-3 mb-4"
                     value={formData.ubicacion}
                     onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
                   >
@@ -252,6 +249,21 @@ const Modulos = () => {
                       <option key={carpeta} value={carpeta}>{carpeta}</option>
                     ))}
                   </select>
+
+                  {/* ✅ Switch para Activar/Desactivar */}
+                  <div className="d-flex align-items-center justify-content-between p-3 rounded-4 border bg-white shadow-sm" style={{borderLeft: '4px solid var(--btn-pastel-blue) !important'}}>
+                    <div>
+                      <div className="fw-bold small">Estado del Módulo</div>
+                      <div className="text-muted" style={{fontSize: '11px'}}>Habilita o deshabilita este módulo</div>
+                    </div>
+                    <div className="form-check form-switch custom-switch-md">
+                      <input className="form-check-input" 
+                             type="checkbox" 
+                             role="switch" 
+                             checked={formData.bitactivo} 
+                             onChange={e => setFormData({...formData, bitactivo: e.target.checked})} />
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -283,9 +295,14 @@ const Modulos = () => {
                   <Layers size={40} />
                 </div>
                 <h4 className="fw-bold text-dark">{selectedModulo?.strnombremodulo}</h4>
-                <span className="badge bg-light text-secondary border px-3 py-2">
-                  <MapPin size={14} className="me-1" /> {selectedModulo?.ubicacion || 'Principal'}
-                </span>
+                <div className="d-flex justify-content-center gap-2 mt-2">
+                  <span className="badge bg-light text-secondary border px-3 py-2">
+                    <MapPin size={14} className="me-1" /> {selectedModulo?.ubicacion || 'Principal'}
+                  </span>
+                  <span className={`badge ${selectedModulo?.bitactivo !== false ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} border px-3 py-2`}>
+                    {selectedModulo?.bitactivo !== false ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
               </div>
               
               <div className="bg-light p-4 rounded-4 text-center">
@@ -304,6 +321,10 @@ const Modulos = () => {
         </div>
       </div>
 
+      <style>{`
+        .custom-switch-md .form-check-input { width: 3em; height: 1.5em; cursor: pointer; }
+        .form-check-input:checked { background-color: #2ecc71 !important; border-color: #2ecc71 !important; }
+      `}</style>
     </div>
   );
 };
