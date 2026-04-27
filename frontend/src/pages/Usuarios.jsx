@@ -257,7 +257,18 @@ const Usuarios = () => {
                 
                 <div className="col-6">
                   <label className="form-label small fw-bold text-muted">Teléfono</label>
-                  <input type="text" className="form-control form-control-sm shadow-none" value={formData.strNumeroCelular} onChange={e => setFormData({...formData, strNumeroCelular: e.target.value})} placeholder="773..." />
+                  <input 
+                    type="text" 
+                    className="form-control form-control-sm shadow-none" 
+                    value={formData.strNumeroCelular} 
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, ""); // Solo permite números
+                      if (val.length <= 10) { // Límite de 10 dígitos
+                        setFormData({...formData, strNumeroCelular: val});
+                      }
+                    }} 
+                    placeholder="773..." 
+                  />
                 </div>
 
                 <div className="col-12"><label className="form-label small fw-bold text-muted">Perfil</label>
