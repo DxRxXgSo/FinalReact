@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Save, CheckCircle, Zap, AlertCircle } from 'lucide-react';
+import { ShieldCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Save, Zap, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-// ✅ Importamos nuestra API en lugar de axios
 import api from '../api'; 
 
 const PermisosPerfil = () => {
@@ -15,7 +13,6 @@ const PermisosPerfil = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 5;
 
-  // ✅ Solo extraemos el 'user', el token ya lo maneja api.js
   const { user } = useAuth();
 
   const permisosUsuario = user?.permisos?.find(p => {
@@ -26,22 +23,39 @@ const PermisosPerfil = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // ✅ Peticiones múltiples limpias sin 'config' ni 'localhost'
-      const [resPermisos, resPerfiles, resModulos] = await Promise.all([
-        api.get('/permisos'),
-        api.get('/perfiles'),
-        api.get('/modulos')
-      ]);
+      
+      // ✅ 1. SOLUCIÓN AL BLOQUEO: Peticiones independientes
+      // En lugar de Promise.all, hacemos peticiones separadas y atrapamos sus errores individualmente.
+      // Así, si falla /modulos, de todas formas carga /perfiles y la página no "explota".
+      
+      let dataPermisos = [];
+      let dataPerfiles = [];
+      let dataModulos = [];
 
-      setPermisos(resPermisos.data);
-      setPerfiles(resPerfiles.data);
-      setModulos(resModulos.data);
+      try {
+        const resPermisos = await api.get('/permisos');
+        dataPermisos = resPermisos.data;
+      } catch (e) { console.warn("No se pudieron cargar los permisos actuales."); }
 
-      if (resPerfiles.data.length > 0 && !selectedPerfil) {
-        setSelectedPerfil(resPerfiles.data[0].id);
+      try {
+        const resPerfiles = await api.get('/perfiles');
+        dataPerfiles = resPerfiles.data;
+      } catch (e) { console.warn("No se pudieron cargar los perfiles."); }
+
+      try {
+        const resModulos = await api.get('/modulos');
+        dataModulos = resModulos.data;
+      } catch (e) { console.warn("El backend bloqueó el acceso a /modulos."); }
+
+      setPermisos(dataPermisos);
+      setPerfiles(dataPerfiles);
+      setModulos(dataModulos);
+
+      if (dataPerfiles.length > 0 && !selectedPerfil) {
+        setSelectedPerfil(dataPerfiles[0].id);
       }
     } catch (error) {
-      console.error("Error al cargar la matriz:", error);
+      console.error("Error crítico en la vista:", error);
     } finally {
       setLoading(false);
     }
@@ -49,7 +63,7 @@ const PermisosPerfil = () => {
 
   useEffect(() => {
     fetchData();
-  }, []); // ✅ Ya no dependemos del token en el useEffect
+  }, []);
 
   const handleTogglePermiso = (idModulo, campo) => {
     setPermisos(prev => {
@@ -90,7 +104,6 @@ const PermisosPerfil = () => {
 
     setSaving(true);
     try {
-      // ✅ Peticiones dinámicas (PUT o POST) ultra limpias
       const promesas = cambiosPendientes.map(p => {
         const payload = {
           idperfil: Number(selectedPerfil),
@@ -157,22 +170,33 @@ const PermisosPerfil = () => {
         )}
       </div>
 
-      {/* SELECTOR */}
-      <div className="d-flex flex-wrap gap-2 mb-4 p-3 bg-white rounded-4 shadow-sm border">
+      {/* ✅ 2. MEJORA DE ESTILO: Selector más profesional, sin aspecto de "error rojo" */}
+      <div className="d-flex flex-wrap gap-2 mb-4 p-3 bg-white rounded-4 shadow-sm border align-items-center">
         <div className="input-group" style={{ width: 'auto' }}>
-          <span className="input-group-text bg-white border-danger text-danger"><Zap size={16} /></span>
+          <span className="input-group-text bg-light border-end-0 text-secondary"><Zap size={16} /></span>
           <select 
-            className="form-select border-danger text-danger fw-bold shadow-none" 
+            className="form-select border-start-0 text-dark fw-bold shadow-none bg-light" 
             value={selectedPerfil} 
             onChange={(e) => { setSelectedPerfil(e.target.value); setCurrentPage(1); }}
+            style={{ cursor: 'pointer' }}
           >
-            {perfiles.map(perf => (
-              <option key={perf.id} value={perf.id}>{perf.strnombreperfil}</option>
-            ))}
+            {perfiles.length > 0 ? (
+               perfiles.map(perf => <option key={perf.id} value={perf.id}>{perf.strnombreperfil}</option>)
+            ) : (
+               <option disabled>No hay perfiles disponibles</option>
+            )}
           </select>
         </div>
+        
+        {/* Mensaje si no cargaron los módulos */}
+        {modulos.length === 0 && (
+          <div className="ms-3 text-warning small fw-bold d-flex align-items-center">
+            <AlertCircle size={14} className="me-1"/> Sin acceso a la lista de módulos
+          </div>
+        )}
+
         {hasChanges && (
-          <div className="ms-3 d-flex align-items-center text-primary small fw-bold">
+          <div className="ms-auto d-flex align-items-center text-primary small fw-bold animate__animated animate__headShake">
             <AlertCircle size={14} className="me-1"/> Tienes cambios sin guardar
           </div>
         )}
@@ -183,12 +207,12 @@ const PermisosPerfil = () => {
           <table className="table table-hover align-middle mb-0">
             <thead className="bg-light text-muted small text-uppercase">
               <tr>
-                <th className="ps-4 py-3">Módulo</th>
-                <th className="text-center">Ver</th>
-                <th className="text-center">Crear</th>
-                <th className="text-center">Editar</th>
-                <th className="text-center">Eliminar</th>
-                <th className="text-center">Detalle</th>
+                <th className="ps-4 py-3 fw-bold">Módulo</th>
+                <th className="text-center fw-bold">Ver</th>
+                <th className="text-center fw-bold">Crear</th>
+                <th className="text-center fw-bold">Editar</th>
+                <th className="text-center fw-bold">Eliminar</th>
+                <th className="text-center fw-bold">Detalle</th>
               </tr>
             </thead>
             <tbody>
@@ -196,7 +220,7 @@ const PermisosPerfil = () => {
                 <tr key={p.idmodulo} className={p.hasChanged ? "bg-primary-subtle bg-opacity-10" : "border-bottom"}>
                   <td className="ps-4">
                     <div className="d-flex align-items-center gap-2">
-                      <ShieldCheck size={16} className={p.bitconsulta ? "text-success" : "text-muted"} />
+                      <ShieldCheck size={18} className={p.bitconsulta ? "text-success" : "text-secondary opacity-50"} />
                       <div className={`fw-bold ${p.hasChanged ? 'text-primary' : 'text-dark'}`}>
                         {p.strnombremodulo}
                       </div>
@@ -219,6 +243,14 @@ const PermisosPerfil = () => {
                   </td>
                 </tr>
               ))}
+              {/* Fallback visual si no hay módulos */}
+              {currentRows.length === 0 && !loading && (
+                 <tr>
+                   <td colSpan="6" className="text-center py-5 text-muted">
+                     No se encontraron módulos para construir la matriz.
+                   </td>
+                 </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -234,7 +266,7 @@ const PermisosPerfil = () => {
           </div>
 
           <span className="badge rounded-circle d-flex align-items-center justify-content-center shadow-sm" 
-                style={{ backgroundColor: 'var(--btn-pastel-pink)', color: 'white', width: '32px', height: '32px', fontSize: '14px' }}>
+                style={{ backgroundColor: 'var(--btn-pastel-blue)', color: 'white', width: '32px', height: '32px', fontSize: '14px' }}>
             {currentPage}
           </span>
 
@@ -249,16 +281,28 @@ const PermisosPerfil = () => {
         </div>
       </div>
 
+      {/* ✅ 3. MEJORA DE ESTILO: CSS Ajustado para Checkboxes deshabilitados */}
       <style>{`
         :root { --cb-green: #2ecc71; --cb-blue: #74b9ff; --cb-yellow: #f1c40f; --cb-pink: #ff7675; --cb-purple: #a29bfe; }
-        .custom-cb { appearance: none; width: 22px; height: 22px; border: 2px solid #e0e0e0; border-radius: 6px; cursor: pointer; position: relative; transition: all 0.2s ease; background-color: #f8f9fa; }
-        .custom-cb:checked::after { content: '✔'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 13px; font-weight: bold; }
+        .custom-cb { 
+          appearance: none; width: 22px; height: 22px; border: 2px solid #ced4da; 
+          border-radius: 6px; cursor: pointer; position: relative; 
+          transition: all 0.2s ease; background-color: #ffffff; 
+        }
+        .custom-cb:checked::after { 
+          content: '✔'; position: absolute; top: 50%; left: 50%; 
+          transform: translate(-50%, -50%); color: white; font-size: 13px; font-weight: bold; 
+        }
         .cb-green:checked { background-color: var(--cb-green); border-color: var(--cb-green); }
         .cb-blue:checked { background-color: var(--cb-blue); border-color: var(--cb-blue); }
         .cb-yellow:checked { background-color: var(--cb-yellow); border-color: var(--cb-yellow); }
         .cb-pink:checked { background-color: var(--cb-pink); border-color: var(--cb-pink); }
         .cb-purple:checked { background-color: var(--cb-purple); border-color: var(--cb-purple); }
-        .custom-cb:disabled { opacity: 0.3; cursor: not-allowed; background-color: #eee; filter: grayscale(1); }
+        
+        /* Ahora los cuadros bloqueados se ven grises pero visibles, no transparentes */
+        .custom-cb:disabled { 
+          opacity: 0.6; cursor: not-allowed; background-color: #e9ecef; border-color: #dee2e6; filter: grayscale(0.8);
+        }
       `}</style>
     </div>
   );

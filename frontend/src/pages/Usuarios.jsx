@@ -15,6 +15,12 @@ const Usuarios = () => {
   // ✅ 2. Ya no sacamos el 'token', el interceptor se encarga
   const { user: loggedUser } = useAuth(); 
 
+  // ✅ 3. LÓGICA DE BLOQUEO CORREGIDA (Busca en singular y plural a prueba de errores)
+  const perms = loggedUser?.permisos?.find(p => {
+    const nombre = p.strnombremodulo?.trim().toLowerCase();
+    return nombre === 'usuario' || nombre === 'usuarios';
+  }) || {};
+
   const [formData, setFormData] = useState({
     strNombreUsuario: '',
     strPwd: '',
@@ -35,7 +41,7 @@ const Usuarios = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // ✅ 3. Peticiones súper limpias usando Promise.all
+      // ✅ 4. Peticiones súper limpias usando Promise.all
       const [resUsers, resProfiles] = await Promise.all([
         api.get('/usuarios'),
         api.get('/perfiles')
@@ -69,7 +75,7 @@ const Usuarios = () => {
     try {
       setLoading(true);
       
-      // ✅ 4. Peticiones PUT y POST sin la variable config
+      // ✅ 5. Peticiones PUT y POST sin la variable config
       if (editingId) {
         await api.put(`/usuarios/${editingId}`, formData);
         
@@ -94,7 +100,7 @@ const Usuarios = () => {
   const handleDelete = async (id) => {
     if (window.confirm("¿Eliminar este usuario?")) {
       try {
-        // ✅ 5. Petición DELETE limpia
+        // ✅ 6. Petición DELETE limpia
         await api.delete(`/usuarios/${id}`);
         fetchData();
       } catch (error) {
@@ -140,10 +146,14 @@ const Usuarios = () => {
           <h3 className="fw-bold mb-0" style={{ color: 'var(--btn-pastel-blue)' }}>Gestión de Usuarios</h3>
           <p className="text-muted small">Administra los colaboradores y su información personal.</p>
         </div>
-        <button className="btn btn-pastel-green text-white fw-bold px-4 py-2 shadow-sm border-0 d-flex align-items-center" 
-                data-bs-toggle="modal" data-bs-target="#userModal" onClick={() => openModal()}>
-          <UserPlus size={18} className="me-2" /> Nuevo Usuario
-        </button>
+        
+        {/* ✅ CAMBIO DE COLOR: btn-pastel-blue | CONDICIÓN: bitagregar */}
+        {perms.bitagregar && (
+          <button className="btn btn-pastel-blue text-white fw-bold px-4 py-2 shadow-sm border-0 d-flex align-items-center" 
+                  data-bs-toggle="modal" data-bs-target="#userModal" onClick={() => openModal()}>
+            <UserPlus size={18} className="me-2" /> Nuevo Usuario
+          </button>
+        )}
       </div>
 
       <div className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
@@ -174,9 +184,22 @@ const Usuarios = () => {
                   </td>
                   <td className="text-center">
                     <div className="d-flex justify-content-center gap-2">
-                      <button className="btn btn-sm btn-light text-primary rounded-circle p-2" data-bs-toggle="modal" data-bs-target="#detailsModal" onClick={() => setSelectedUser(u)}><Eye size={16} /></button>
-                      <button className="btn btn-sm btn-light text-warning rounded-circle p-2" data-bs-toggle="modal" data-bs-target="#userModal" onClick={() => openModal(u)}><Edit2 size={16} /></button>
-                      <button className="btn btn-sm btn-light text-danger rounded-circle p-2" onClick={() => handleDelete(u.id)}><Trash2 size={16} /></button>
+                      
+                      {/* ✅ USANDO bitdetalle PARA EL OJITO */}
+                      {perms.bitdetalle && (
+                        <button className="btn btn-sm btn-light text-primary rounded-circle p-2" data-bs-toggle="modal" data-bs-target="#detailsModal" onClick={() => setSelectedUser(u)}><Eye size={16} /></button>
+                      )}
+                      
+                      {/* ✅ CONDICIÓN: biteditar */}
+                      {perms.biteditar && (
+                        <button className="btn btn-sm btn-light text-warning rounded-circle p-2" data-bs-toggle="modal" data-bs-target="#userModal" onClick={() => openModal(u)}><Edit2 size={16} /></button>
+                      )}
+                      
+                      {/* ✅ CONDICIÓN: biteliminar */}
+                      {perms.biteliminar && (
+                        <button className="btn btn-sm btn-light text-danger rounded-circle p-2" onClick={() => handleDelete(u.id)}><Trash2 size={16} /></button>
+                      )}
+                      
                     </div>
                   </td>
                 </tr>
@@ -257,18 +280,7 @@ const Usuarios = () => {
                 
                 <div className="col-6">
                   <label className="form-label small fw-bold text-muted">Teléfono</label>
-                  <input 
-                    type="text" 
-                    className="form-control form-control-sm shadow-none" 
-                    value={formData.strNumeroCelular} 
-                    onChange={e => {
-                      const val = e.target.value.replace(/\D/g, ""); // Solo permite números
-                      if (val.length <= 10) { // Límite de 10 dígitos
-                        setFormData({...formData, strNumeroCelular: val});
-                      }
-                    }} 
-                    placeholder="773..." 
-                  />
+                  <input type="text" className="form-control form-control-sm shadow-none" value={formData.strNumeroCelular} onChange={e => setFormData({...formData, strNumeroCelular: e.target.value})} placeholder="773..." />
                 </div>
 
                 <div className="col-12"><label className="form-label small fw-bold text-muted">Perfil</label>

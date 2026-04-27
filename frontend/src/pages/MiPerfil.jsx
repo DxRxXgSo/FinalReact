@@ -3,31 +3,25 @@ import { useAuth } from '../context/AuthContext';
 import { Camera, Save, User as UserIcon, Mail, Phone, Lock, UserCheck, Edit2, X } from 'lucide-react';
 
 // ✅ IMPORTAMOS TU NUEVA INSTANCIA DE API
-// Asegúrate de que la ruta sea correcta según donde hayas guardado api.js
-// Quítale la palabra 'config'
 import api from '../api';
 
 const MiPerfil = () => {
-  // Ya no necesitamos sacar el 'token' del context, el api.js se encarga de eso
   const { user } = useAuth(); 
   
-  // Controla si el formulario está bloqueado o en modo edición
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Iniciamos el formulario con los datos actuales del usuario en sesión
   const [formData, setFormData] = useState({
     strNombreUsuario: user?.strnombreusuario || user?.strNombreUsuario || '',
     strCorreo: user?.strcorreo || user?.strCorreo || '',
     strNumeroCelular: user?.strnumerocelular || user?.strNumeroCelular || '',
-    strPwd: '', // Siempre vacío por seguridad
+    strPwd: '', 
     imgURL: user?.imgurl || user?.imgURL || ''
   });
   
   const [preview, setPreview] = useState(user?.imgurl || user?.imgURL || null);
 
-  // Lógica para previsualizar y convertir la imagen a Base64
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -40,19 +34,39 @@ const MiPerfil = () => {
     }
   };
 
-  // Guardar los cambios
   const handleSave = async (e) => {
     e.preventDefault();
+
+    // 🛡️ INICIO DE VALIDACIONES FRONTEND
+    const nombreLimpio = formData.strNombreUsuario.trim();
+    if (nombreLimpio.length < 3) {
+      return alert("⚠️ El nombre de usuario debe tener al menos 3 caracteres.");
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.strCorreo)) {
+      return alert("⚠️ Por favor, ingresa un correo electrónico válido.");
+    }
+
+    if (formData.strNumeroCelular && formData.strNumeroCelular.length !== 10) {
+      return alert("⚠️ El número celular debe tener exactamente 10 dígitos.");
+    }
+
+    if (formData.strPwd && formData.strPwd.length < 6) {
+      return alert("⚠️ Por seguridad, la nueva contraseña debe tener al menos 6 caracteres.");
+    }
+    // 🛡️ FIN DE VALIDACIONES
+
     try {
       setLoading(true);
       
-      // ✅ USAMOS LA INSTANCIA DE API
-      // Mira lo limpia que quedó la petición, sin configs ni localhost
-      await api.put('/usuarios/perfil/update', formData);
+      // Enviamos el nombre limpio de espacios extra
+      const dataToSend = { ...formData, strNombreUsuario: nombreLimpio };
+      
+      await api.put('/usuarios/perfil/update', dataToSend);
       
       alert("¡Tu perfil ha sido actualizado exitosamente! Cierra sesión y vuelve a entrar para ver los cambios en todo el sistema.");
       
-      // Limpiar la contraseña y bloquear el formulario nuevamente
       setFormData({ ...formData, strPwd: '' });
       setIsEditing(false);
 
@@ -64,7 +78,6 @@ const MiPerfil = () => {
     }
   };
 
-  // Restaurar los valores si el usuario se arrepiente de editar
   const handleCancel = () => {
     setFormData({
       strNombreUsuario: user?.strnombreusuario || user?.strNombreUsuario || '',
@@ -83,7 +96,6 @@ const MiPerfil = () => {
         <div className="col-12 col-md-8 col-lg-6">
           <div className="card border-0 shadow-sm rounded-4 overflow-hidden position-relative">
             
-            {/* BOTÓN EDITAR (Aparece solo si NO estamos editando) */}
             {!isEditing && (
               <button 
                 className="btn btn-light position-absolute top-0 end-0 mt-3 me-3 text-primary shadow-sm rounded-pill fw-bold d-flex align-items-center"
@@ -102,7 +114,6 @@ const MiPerfil = () => {
             <div className="card-body p-4 p-md-5 pt-3">
               <form onSubmit={handleSave}>
                 
-                {/* SECCIÓN DE FOTO DE PERFIL */}
                 <div className="text-center mb-4">
                   <div className="position-relative d-inline-block">
                     <div 
@@ -117,7 +128,6 @@ const MiPerfil = () => {
                       )}
                     </div>
                     
-                    {/* Solo mostramos la cámara en modo edición */}
                     {isEditing && (
                       <div 
                         className="position-absolute bottom-0 end-0 bg-white rounded-circle shadow-sm p-2 border" 
@@ -138,7 +148,6 @@ const MiPerfil = () => {
                   </div>
                 </div>
 
-                {/* EL FIELDSET BLOQUEA LOS INPUTS AUTOMÁTICAMENTE SI NO ESTÁ EN EDICIÓN */}
                 <fieldset disabled={!isEditing}>
                   <div className="mb-3">
                     <label className="form-label small fw-bold text-muted">Nombre de Usuario</label>
@@ -177,12 +186,17 @@ const MiPerfil = () => {
                         className="form-control bg-light border-start-0 shadow-none px-0" 
                         placeholder="Ej. 773..."
                         value={formData.strNumeroCelular} 
-                        onChange={e => setFormData({...formData, strNumeroCelular: e.target.value})} 
+                        onChange={e => {
+                          // 🛡️ VALIDACIÓN EN TIEMPO REAL: Solo permite números y máximo 10 dígitos
+                          const val = e.target.value.replace(/\D/g, "");
+                          if (val.length <= 10) {
+                            setFormData({...formData, strNumeroCelular: val});
+                          }
+                        }} 
                       />
                     </div>
                   </div>
 
-                  {/* Campo de contraseña solo visible al editar */}
                   {isEditing && (
                     <div className="mb-4 animate__animated animate__fadeIn">
                       <label className="form-label small fw-bold text-muted">Nueva Contraseña</label>
@@ -199,7 +213,6 @@ const MiPerfil = () => {
                     </div>
                   )}
 
-                  {/* Botones de Guardar y Cancelar (Solo en edición) */}
                   {isEditing && (
                     <div className="d-flex gap-2 mt-4 animate__animated animate__fadeInUp">
                       <button 

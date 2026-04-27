@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layers, Edit, Trash2, PlusCircle, X, Save, MapPin, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Layers, Edit, Trash2, PlusCircle, X, Save, MapPin, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 // ✅ 1. Importamos nuestra API configurada
@@ -20,6 +20,9 @@ const Modulos = () => {
   const [currentId, setCurrentId] = useState(null);
   
   const [formData, setFormData] = useState({ strnombremodulo: '', ubicacion: 'Principal' });
+  
+  // ✅ ESTADO NUEVO: Para guardar el módulo seleccionado para ver detalles
+  const [selectedModulo, setSelectedModulo] = useState(null);
 
   const permisos = user?.permisos?.find(p => {
     const nombreBD = p.strnombremodulo?.trim().toLowerCase();
@@ -109,6 +112,16 @@ const Modulos = () => {
     }
   };
 
+  // ✅ FUNCIÓN NUEVA: Genera una descripción dinámica según el nombre del módulo
+  const generarDescripcion = (nombre) => {
+    if (!nombre) return '';
+    const n = nombre.toLowerCase();
+    if (n.includes('usuario')) return 'Este módulo gestiona las credenciales, información personal y el estado activo/inactivo de todos los colaboradores registrados en el sistema.';
+    if (n.includes('perfil') || n.includes('permiso')) return 'Se encarga de administrar la seguridad jerárquica (RBAC). Aquí se definen los roles y se otorgan o revocan privilegios específicos a cada pantalla.';
+    if (n.includes('modulo')) return 'Actúa como el configurador del sistema. Permite dar de alta nuevas secciones, pantallas y agruparlas en carpetas para construir el menú dinámico.';
+    return `Este módulo proporciona las herramientas necesarias para la captura, visualización y administración de los registros correspondientes al área de ${nombre}.`;
+  };
+
   if (loading) return <div className="text-center p-5"><div className="spinner-border text-info"></div></div>;
 
   return (
@@ -161,11 +174,22 @@ const Modulos = () => {
                   </td>
                   <td className="text-end pe-4">
                     <div className="d-flex justify-content-end gap-2">
+                      
+                      {/* ✅ CONDICIÓN NUEVA: bitdetalle */}
+                      {permisos.bitdetalle && (
+                        <button className="btn btn-sm btn-light text-primary border shadow-sm" 
+                                data-bs-toggle="modal" data-bs-target="#moduloDetalleModal" 
+                                onClick={() => setSelectedModulo(m)}>
+                          <Eye size={16} />
+                        </button>
+                      )}
+
                       {permisos.biteditar && (
                         <button className="btn btn-sm btn-light text-warning border shadow-sm" onClick={() => abrirModalEditar(m)}>
                           <Edit size={16} />
                         </button>
                       )}
+                      
                       {permisos.biteliminar && (
                         <button className="btn btn-sm btn-light text-danger border shadow-sm" onClick={() => handleEliminar(m.id, m.strnombremodulo)}>
                           <Trash2 size={16} />
@@ -196,7 +220,7 @@ const Modulos = () => {
         </div>
       </div>
 
-      {/* --- MODAL DINÁMICO --- */}
+      {/* --- MODAL CREAR/EDITAR DINÁMICO --- */}
       {showModal && (
         <div className="position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
           <div className="card border-0 shadow-lg rounded-4 animate__animated animate__zoomIn" style={{ width: '400px', maxWidth: '90%' }}>
@@ -241,6 +265,44 @@ const Modulos = () => {
           </div>
         </div>
       )}
+
+      {/* --- MODAL DETALLES DEL MÓDULO --- */}
+      <div className="modal fade" id="moduloDetalleModal" tabIndex="-1" aria-hidden="true">
+        <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div className="modal-header text-white p-4 border-0" style={{ backgroundColor: 'var(--btn-pastel-blue)' }}>
+              <h5 className="modal-title fw-bold d-flex align-items-center">
+                <Info size={22} className="me-2" />
+                Detalles del Módulo
+              </h5>
+              <button type="button" className="btn-close btn-close-white shadow-none" data-bs-dismiss="modal"></button>
+            </div>
+            <div className="modal-body p-4">
+              <div className="text-center mb-4">
+                <div className="d-inline-flex p-3 rounded-circle bg-light text-primary mb-3 shadow-sm">
+                  <Layers size={40} />
+                </div>
+                <h4 className="fw-bold text-dark">{selectedModulo?.strnombremodulo}</h4>
+                <span className="badge bg-light text-secondary border px-3 py-2">
+                  <MapPin size={14} className="me-1" /> {selectedModulo?.ubicacion || 'Principal'}
+                </span>
+              </div>
+              
+              <div className="bg-light p-4 rounded-4 text-center">
+                <h6 className="fw-bold text-muted mb-2 text-uppercase" style={{ fontSize: '12px' }}>¿Qué hace este módulo?</h6>
+                <p className="small text-dark mb-0 lh-lg">
+                  {generarDescripcion(selectedModulo?.strnombremodulo)}
+                </p>
+              </div>
+            </div>
+            <div className="modal-footer border-0 p-3 bg-white">
+              <button className="btn btn-pastel-blue text-white w-100 rounded-pill fw-bold" data-bs-dismiss="modal">
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
     </div>
   );
