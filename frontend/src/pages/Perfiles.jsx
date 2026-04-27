@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Shield, Plus, Edit3, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Shield, Plus, Edit3, Trash2, Search, ChevronLeft, ChevronRight, Eye, Info } from 'lucide-react';
 
 // ✅ 1. Importamos nuestra API en lugar de axios
 import api from '../api'; 
+import { useAuth } from '../context/AuthContext'; // ✅ Importamos useAuth
 
 const Perfiles = () => {
   const [perfiles, setPerfiles] = useState([]);
@@ -10,10 +11,20 @@ const Perfiles = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 5;
 
+  // ✅ Extraemos el usuario y sus permisos
+  const { user } = useAuth();
+  const perms = user?.permisos?.find(p => {
+    const nombre = p.strnombremodulo?.trim().toLowerCase();
+    return nombre === 'perfil' || nombre === 'perfiles';
+  }) || {};
+
   // ✅ Solo manejamos el nombre, bitadministrador se manda como false por defecto
   const [formData, setFormData] = useState({ strNombrePerfil: '' });
   const [editingId, setEditingId] = useState(null); 
   const [filtroTexto, setFiltroTexto] = useState(''); 
+  
+  // ✅ ESTADO NUEVO: Para guardar el perfil seleccionado para ver detalles
+  const [selectedPerfil, setSelectedPerfil] = useState(null);
 
   const closeModalBtn = useRef(null);
 
@@ -102,14 +113,18 @@ const Perfiles = () => {
           </h3>
           <p className="text-muted small">Define los roles de seguridad para los usuarios.</p>
         </div>
-        <button 
-          className="btn btn-pastel-blue text-white fw-bold px-4 py-2 shadow-sm border-0 d-flex align-items-center"
-          data-bs-toggle="modal" 
-          data-bs-target="#perfilModal"
-          onClick={() => openModal()}
-        >
-          <Plus size={18} className="me-2" /> Nuevo Perfil
-        </button>
+        
+        {/* ✅ CONDICIÓN: bitagregar */}
+        {perms.bitagregar && (
+          <button 
+            className="btn btn-pastel-blue text-white fw-bold px-4 py-2 shadow-sm border-0 d-flex align-items-center"
+            data-bs-toggle="modal" 
+            data-bs-target="#perfilModal"
+            onClick={() => openModal()}
+          >
+            <Plus size={18} className="me-2" /> Nuevo Perfil
+          </button>
+        )}
       </div>
 
       <div className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
@@ -146,20 +161,41 @@ const Perfiles = () => {
                     </td>
                     <td className="text-center">
                       <div className="d-flex justify-content-center gap-3">
-                        <button 
-                          className="btn btn-sm btn-light text-warning rounded-circle p-2 border-0 shadow-sm"
-                          data-bs-toggle="modal" 
-                          data-bs-target="#perfilModal"
-                          onClick={() => openModal(p)}
-                        >
-                          <Edit3 size={18} />
-                        </button>
-                        <button 
-                          className="btn btn-sm btn-light text-danger rounded-circle p-2 border-0 shadow-sm"
-                          onClick={() => handleDelete(p.id)}
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        
+                        {/* ✅ CONDICIÓN NUEVA: bitdetalle */}
+                        {perms.bitdetalle && (
+                          <button 
+                            className="btn btn-sm btn-light text-primary rounded-circle p-2 border-0 shadow-sm"
+                            data-bs-toggle="modal" 
+                            data-bs-target="#perfilDetalleModal"
+                            onClick={() => setSelectedPerfil(p)}
+                          >
+                            <Eye size={18} />
+                          </button>
+                        )}
+
+                        {/* ✅ CONDICIÓN: biteditar */}
+                        {perms.biteditar && (
+                          <button 
+                            className="btn btn-sm btn-light text-warning rounded-circle p-2 border-0 shadow-sm"
+                            data-bs-toggle="modal" 
+                            data-bs-target="#perfilModal"
+                            onClick={() => openModal(p)}
+                          >
+                            <Edit3 size={18} />
+                          </button>
+                        )}
+
+                        {/* ✅ CONDICIÓN: biteliminar */}
+                        {perms.biteliminar && (
+                          <button 
+                            className="btn btn-sm btn-light text-danger rounded-circle p-2 border-0 shadow-sm"
+                            onClick={() => handleDelete(p.id)}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+
                       </div>
                     </td>
                   </tr>
@@ -189,7 +225,7 @@ const Perfiles = () => {
         </div>
       </div>
 
-      {/* MODAL SIMPLIFICADO */}
+      {/* MODAL SIMPLIFICADO DE CREAR/EDITAR */}
       <div className="modal fade" id="perfilModal" tabIndex="-1" aria-hidden="true" data-bs-backdrop="static">
         <div className="modal-dialog modal-dialog-centered">
           <div className="modal-content border-0 shadow-lg rounded-4">
@@ -213,11 +249,49 @@ const Perfiles = () => {
               <button type="button" className="btn btn-light rounded-pill px-4 fw-bold" data-bs-dismiss="modal" onClick={resetForm}>Cancelar</button>
               <button 
                 type="button" 
-                className="btn btn-pastel-pink text-white rounded-pill px-4 shadow-sm fw-bold"
+                className="btn text-white rounded-pill px-4 shadow-sm fw-bold"
                 onClick={handleSave}
                 style={{ backgroundColor: 'var(--btn-pastel-pink)' }}
               >
                 {editingId ? 'Actualizar' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* --- MODAL DETALLES DEL PERFIL --- */}
+      <div className="modal fade" id="perfilDetalleModal" tabIndex="-1" aria-hidden="true">
+        <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div className="modal-header text-white p-4 border-0" style={{ backgroundColor: 'var(--btn-pastel-pink)' }}>
+              <h5 className="modal-title fw-bold d-flex align-items-center">
+                <Info size={22} className="me-2" />
+                Detalles del Rol
+              </h5>
+              <button type="button" className="btn-close btn-close-white shadow-none" data-bs-dismiss="modal"></button>
+            </div>
+            <div className="modal-body p-4">
+              <div className="text-center mb-4">
+                <div className="d-inline-flex p-3 rounded-circle bg-light mb-3 shadow-sm" style={{ color: 'var(--btn-pastel-pink)' }}>
+                  <Shield size={40} />
+                </div>
+                <h4 className="fw-bold text-dark">{selectedPerfil?.strnombreperfil}</h4>
+                <span className="badge bg-success-subtle text-success border px-3 py-2 mt-2">
+                  Rol Activo en el Sistema
+                </span>
+              </div>
+              
+              <div className="bg-light p-4 rounded-4 text-center">
+                <h6 className="fw-bold text-muted mb-2 text-uppercase" style={{ fontSize: '12px' }}>¿Para qué sirve este rol?</h6>
+                <p className="small text-dark mb-0 lh-lg">
+                  Este perfil define el nivel de seguridad y los privilegios que tendrán los usuarios asignados a él. Puedes configurar sus accesos (Ver, Crear, Editar, Eliminar) en la sección de <b>Matriz de Permisos</b>.
+                </p>
+              </div>
+            </div>
+            <div className="modal-footer border-0 p-3 bg-white">
+              <button className="btn text-white w-100 rounded-pill fw-bold" style={{ backgroundColor: 'var(--btn-pastel-pink)' }} data-bs-dismiss="modal">
+                Entendido
               </button>
             </div>
           </div>
