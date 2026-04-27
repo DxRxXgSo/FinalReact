@@ -18,7 +18,7 @@ const Modulos = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   
-  // ✅ Agregamos 'bitactivo' al estado inicial (por defecto true)
+  // ✅ Estado inicial con bitactivo
   const [formData, setFormData] = useState({ strnombremodulo: '', ubicacion: 'Principal', bitactivo: true });
   
   const [selectedModulo, setSelectedModulo] = useState(null);
@@ -45,6 +45,22 @@ const Modulos = () => {
     fetchModulos();
   }, []); 
 
+  // ✅ Función para cambiar el estado (Activo/Inactivo) rápidamente desde la tabla
+  const handleToggleActivo = async (modulo) => {
+    try {
+      const nuevoEstado = {
+        strnombremodulo: modulo.strnombremodulo,
+        ubicacion: modulo.ubicacion,
+        bitactivo: !modulo.bitactivo
+      };
+      await api.put(`/modulos/${modulo.id}`, nuevoEstado);
+      fetchModulos(); // Recargar datos
+    } catch (error) {
+      console.error("Error al cambiar estado:", error);
+      alert("No se pudo cambiar el estado del módulo.");
+    }
+  };
+
   const indexOfLastRow = currentPage * rowsPerPage;
   const indexOfFirstRow = indexOfLastRow - rowsPerPage;
   const currentRows = modulos.slice(indexOfFirstRow, indexOfLastRow);
@@ -63,7 +79,6 @@ const Modulos = () => {
     setFormData({ 
       strnombremodulo: modulo.strnombremodulo, 
       ubicacion: modulo.ubicacion || 'Principal',
-      // ✅ Cargamos el estado real del módulo (si es undefined, asumimos true)
       bitactivo: modulo.bitactivo !== false 
     });
     setShowModal(true);
@@ -79,7 +94,6 @@ const Modulos = () => {
     if (!formData.strnombremodulo.trim()) return alert("El nombre del módulo es obligatorio");
     
     try {
-      // ✅ Enviamos la data completa, incluyendo bitactivo
       if (isEditing) {
         await api.put(`/modulos/${currentId}`, formData);
       } else {
@@ -163,12 +177,20 @@ const Modulos = () => {
                     </span>
                   </td>
                   <td className="text-center">
-                    {/* ✅ Lógica condicional para el estado */}
-                    {m.bitactivo !== false ? (
-                      <span className="badge bg-success-subtle text-success rounded-pill px-3">Activo</span>
-                    ) : (
-                      <span className="badge bg-danger-subtle text-danger rounded-pill px-3">Inactivo</span>
-                    )}
+                    {/* ✅ Switch integrado en la tabla para cambios rápidos */}
+                    <div className="form-check form-switch d-inline-block custom-switch-md">
+                      <input 
+                        className="form-check-input" 
+                        type="checkbox" 
+                        role="switch" 
+                        checked={m.bitactivo !== false} 
+                        onChange={() => handleToggleActivo(m)}
+                        title={m.bitactivo !== false ? "Desactivar módulo" : "Activar módulo"}
+                      />
+                      <div className="small mt-1 fw-bold" style={{ fontSize: '10px', color: m.bitactivo !== false ? '#2ecc71' : '#e74c3c' }}>
+                         {m.bitactivo !== false ? 'ACTIVO' : 'INACTIVO'}
+                      </div>
+                    </div>
                   </td>
                   <td className="text-end pe-4">
                     <div className="d-flex justify-content-end gap-2">
@@ -250,7 +272,7 @@ const Modulos = () => {
                     ))}
                   </select>
 
-                  {/* ✅ Switch para Activar/Desactivar */}
+                  {/* ✅ Switch para Activar/Desactivar dentro del Modal */}
                   <div className="d-flex align-items-center justify-content-between p-3 rounded-4 border bg-white shadow-sm" style={{borderLeft: '4px solid var(--btn-pastel-blue) !important'}}>
                     <div>
                       <div className="fw-bold small">Estado del Módulo</div>
@@ -324,6 +346,7 @@ const Modulos = () => {
       <style>{`
         .custom-switch-md .form-check-input { width: 3em; height: 1.5em; cursor: pointer; }
         .form-check-input:checked { background-color: #2ecc71 !important; border-color: #2ecc71 !important; }
+        .form-check-input:focus { box-shadow: none !important; }
       `}</style>
     </div>
   );
